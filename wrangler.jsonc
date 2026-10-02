@@ -1,0 +1,10 @@
+// Cloudflare static deployment (Workers static assets). `npx wrangler deploy` after `npm run build`.
+// Also works as-is on Cloudflare Pages with build command `npm run build` and output dir `dist`.
+{
+  "name": "onepixel",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

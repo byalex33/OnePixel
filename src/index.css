@@ -1,0 +1,256 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #171717;
+  --color-panel: #1b1b1b;
+  --color-line: #333333;
+  --color-dim: #7a7a7a;
+  --color-mute: #555555;
+  --color-ink: #d4d4d4;
+  --color-hi: #f2f2f2;
+  --color-gold: #ffcc33;
+  --color-red: #ff4d3d;
+  --color-cyan: #5ee6ff;
+  --color-orange: #ff9a2e;
+  --color-coral: #ff6f61;
+  --font-pixel: 'Press Start 2P', ui-monospace, monospace;
+  --font-term: 'VT323', ui-monospace, monospace;
+  --font-hand: 'Caveat', 'Comic Sans MS', cursive;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    overscroll-behavior: none;
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-term);
+    font-size: 20px;
+    line-height: 1.1;
+    -webkit-font-smoothing: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    overflow: hidden;
+  }
+  button {
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  ::selection {
+    background: var(--color-dim);
+    color: var(--color-bg);
+  }
+}
+
+@layer components {
+  /* Square box with a title sitting in the top border, terminal style. */
+  .frame {
+    position: relative;
+    border: 2px solid var(--color-line);
+    background: var(--color-bg);
+  }
+  .frame-title {
+    position: absolute;
+    top: -0.55rem;
+    left: 0.5rem;
+    padding: 0 0.35rem;
+    background: var(--color-bg);
+    font-family: var(--font-pixel);
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: var(--color-dim);
+    line-height: 1rem;
+  }
+  /* LED dot-matrix texture, same language as the arena. */
+  .dots {
+    background-color: var(--color-bg);
+    background-image: radial-gradient(rgb(122 122 122 / 0.16) 1px, transparent 1.2px);
+    background-size: 8px 8px;
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
+  }
+  .px-shadow {
+    box-shadow: 4px 4px 0 0 #0c0c0c;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes boot {
+  0% {
+    clip-path: inset(0 100% 100% 0);
+  }
+  40% {
+    clip-path: inset(-2rem -2rem 100% -2rem);
+  }
+  100% {
+    clip-path: inset(-2rem -2rem -2rem -2rem);
+  }
+}
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes rise-fade {
+  0% {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  12% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+}
+@keyframes jolt {
+  0% {
+    transform: translate(0, 0) scale(1.25);
+  }
+  50% {
+    transform: translate(-1px, 1px) scale(0.95);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slide-in-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.anim-blink {
+  animation: blink 1s steps(1) infinite;
+}
+.anim-blink-fast {
+  animation: blink 0.4s steps(1) infinite;
+}
+.anim-pop {
+  animation: pop-in 0.35s steps(6) both;
+}
+.anim-boot {
+  animation: boot 0.45s steps(8) both;
+}
+.anim-jolt {
+  animation: jolt 0.18s steps(3) both;
+}
+.anim-rise {
+  animation: rise-fade 3.2s steps(24) both;
+}
+.anim-slide-left {
+  animation: slide-in-left 0.4s steps(8) both;
+}
+.anim-slide-up {
+  animation: slide-in-up 0.4s steps(8) both;
+}
+
+/* First-run "click me!" hint: the arrow draws itself in, then gently bobs. */
+@keyframes hint-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes hint-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px) rotate(-7deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(-7deg);
+  }
+}
+@keyframes hint-bob {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(3px, 3px);
+  }
+}
+.hint-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hint-draw 0.5s ease-out 0.9s forwards;
+}
+.hint-draw-late {
+  animation-delay: 1.35s;
+  animation-duration: 0.2s;
+}
+.hint-fade {
+  opacity: 0;
+  animation: hint-fade 0.35s ease-out 1.5s forwards;
+}
+.hint-bob {
+  animation: hint-bob 1.8s ease-in-out 2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-draw,
+  .hint-fade {
+    animation-duration: 0.01s;
+  }
+  .hint-bob {
+    animation: none;
+  }
+  .anim-blink,
+  .anim-blink-fast,
+  .anim-jolt {
+    animation: none;
+  }
+}
