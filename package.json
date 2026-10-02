@@ -10,7 +10,8 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "test": "vitest run",
-    "balance": "vitest run src/game/balance.test.ts --reporter verbose"
+    "balance": "vitest run src/game/balance.test.ts --reporter verbose",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",

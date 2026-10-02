@@ -19,9 +19,9 @@ export function BalanceBox({ ref }: { ref: React.Ref<HTMLDivElement> }) {
         <span className="truncate font-pixel text-[14px] text-hi md:text-[20px]">{fmt(s.pixels)}</span>
       </div>
       <div className="mt-1 text-[17px] leading-none text-dim md:text-[19px]">{rate > 0 ? `+${fmt(rate)}/s` : 'pixels'}</div>
-      <div className="mt-2 flex items-baseline justify-between font-pixel text-[8px] text-dim">
+      <div className="mt-2 flex items-baseline justify-between gap-2 font-pixel text-[7px] whitespace-nowrap text-dim md:text-[8px]">
         <span className="text-ink">LV {s.level}</span>
-        <span>
+        <span className="truncate">
           {fmt(s.xp)}/{fmt(need)} XP
         </span>
       </div>

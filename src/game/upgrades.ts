@@ -36,7 +36,7 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'multi', name: 'EXTRA PIXEL', desc: 'One more pixel in the arena.', requires: 'second', baseCost: 12, growth: 2.9, max: 17, show: (l) => `${l + 1} px` },
   { id: 'critChance', name: 'CRIT CHANCE', desc: 'Unlock critical hits. Levels raise the odds.', requires: 'crit', baseCost: 80, growth: 2.0, max: 13, show: (l) => off(l, () => pct(F.critChance(l))) },
   { id: 'critPower', name: 'CRIT POWER', desc: 'Critical hits pay out more.', requires: 'crit', baseCost: 150, growth: 2.1, max: 20, show: (l) => x(F.critMult(l)) },
-  { id: 'fox', name: 'FOX FRIEND', desc: 'Your fox leaps to catch nearby pixels, golden ones too. Levels: more often, further.', minLevel: FOX_LEVEL, baseCost: 60, growth: 2.3, max: 12, show: (l) => off(l, () => `${s(F.foxCooldown(l))} ${u(F.foxRange(l))}`) },
+  { id: 'fox', name: 'FOX FRIEND', desc: 'Your fox leaps to catch nearby pixels, golden ones too. Levels: more often, further.', minLevel: FOX_LEVEL, baseCost: 60, growth: 2.3, max: 12, show: (l) => off(l, () => s(F.foxCooldown(l))) },
   { id: 'combo', name: 'COMBOS', desc: 'Unlock combos: quick pops stack +3% each. Levels raise the cap.', requires: 'combo', baseCost: 120, growth: 2.0, max: 13, show: (l) => off(l, () => `${F.comboCap(l)} stk`) },
   { id: 'xp', name: 'XP GAIN', desc: 'More XP from every pixel.', requires: 'combo', baseCost: 100, growth: 2.15, max: 20, show: (l) => x(F.xpMult(l)) },
   { id: 'blast', name: 'BLAST RADIUS', desc: 'Unlock explosive taps that hit nearby pixels. Levels grow the blast.', requires: 'blast', baseCost: 350, growth: 2.15, max: 16, show: (l) => off(l, () => u(F.blastRadius(l))) },
