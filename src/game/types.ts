@@ -68,6 +68,7 @@ export interface LifetimeStats {
 
 export interface Settings {
   sound: boolean
+  music: boolean
   shake: boolean
   haptics: boolean
 }

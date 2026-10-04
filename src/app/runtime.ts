@@ -1,3 +1,4 @@
+import { Music } from '../audio/music'
 import { Sfx } from '../audio/sfx'
 import { AUTOSAVE_SECONDS, DT, MIN_OFFLINE_SECONDS, MAX_OFFLINE_SECONDS } from '../game/config'
 import { Game, type Rect } from '../game/game'
@@ -35,6 +36,7 @@ function safeStorage(): KeyValueStore | null {
 export class Runtime {
   game: Game
   readonly sfx = new Sfx()
+  readonly music = new Music()
   renderer: Renderer | null = null
   notices: Notice[] = []
 
@@ -110,6 +112,7 @@ export class Runtime {
   private onPageHide = () => this.save()
 
   private onVisibility = () => {
+    this.music.setPaused(document.hidden)
     if (document.hidden) {
       this.hiddenAt = performance.now()
       this.save()
@@ -221,29 +224,34 @@ export class Runtime {
 
   // ---------------------------------------------------------------- actions
 
-  pointer(cssX: number, cssY: number): void {
+  private unlockAudio(): void {
     this.sfx.unlock()
+    this.music.attach(this.sfx.context)
+  }
+
+  pointer(cssX: number, cssY: number): void {
+    this.unlockAudio()
     if (!this.renderer) return
     const { x, y } = this.renderer.toWorld(cssX, cssY)
     this.game.pointerDown(x, y)
   }
 
   buy(id: UpgradeId): boolean {
-    this.sfx.unlock()
+    this.unlockAudio()
     const ok = this.game.buy(id)
     this.bump()
     return ok
   }
 
   buyMax(id: UpgradeId): number {
-    this.sfx.unlock()
+    this.unlockAudio()
     const n = this.game.buyMax(id)
     this.bump()
     return n
   }
 
   launchNuke(): void {
-    this.sfx.unlock()
+    this.unlockAudio()
     if (this.game.launchNuke()) this.bump()
   }
 
@@ -261,6 +269,7 @@ export class Runtime {
   private applySettings(): void {
     const s = this.game.state.settings
     this.sfx.enabled = s.sound
+    this.music.setEnabled(s.music)
     if (this.renderer) {
       this.renderer.shakeEnabled = s.shake
       this.renderer.reducedMotion = this.reducedMotion

@@ -37,6 +37,10 @@ export class Sfx {
   private last = new Map<Cue, number>()
   private budget = 0
 
+  get context(): AudioContext | null {
+    return this.ctx
+  }
+
   /** Must be called from a user gesture (browser autoplay policy). */
   unlock(): void {
     if (this.ctx) {

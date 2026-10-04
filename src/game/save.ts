@@ -69,6 +69,7 @@ export function sanitizeState(raw: unknown): SaveState {
   if (isObj(raw.settings)) {
     out.settings = {
       sound: bool(raw.settings.sound, true),
+      music: bool(raw.settings.music, true),
       shake: bool(raw.settings.shake, true),
       haptics: bool(raw.settings.haptics, true),
     }

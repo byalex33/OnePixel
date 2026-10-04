@@ -45,6 +45,6 @@ export function createInitialState(): SaveState {
     rainTimer: rainInterval(0) * 0.4,
     seenUpgrades: [],
     reveal: { hud: false, panel: false },
-    settings: { sound: true, shake: true, haptics: true },
+    settings: { sound: true, music: true, shake: true, haptics: true },
   }
 }

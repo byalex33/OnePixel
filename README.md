@@ -69,7 +69,7 @@ Controls: click or tap pixels. Tap a bomb to detonate it early. Tap an upgrade t
 - Chunky pixel-particle explosions, screen shake, hit-stop on crits and floating reward numbers
 - Shockwaves that light up the dot-matrix background as they pass
 - Combos that recolour the explosions as they climb
-- Synthesised chiptune sound effects (no audio files) and haptics on supported phones
+- Synthesised chiptune sound effects and ambient background music (no audio files), plus haptics on supported phones
 
 **Mechanics**
 - Critical hits, combos, explosive taps and chain reactions
@@ -277,7 +277,7 @@ OnePixel is a static site.
 
 - More of the late game beyond level 20 (something is stirring beneath the grid)
 - Prestige / reset layer
-- Sampled sound pack and music
+- Sampled sound pack
 - More creatures sharing the arena with the fox
 
 Ideas and bug reports are welcome in [issues](https://github.com/byalex33/OnePixel/issues).
