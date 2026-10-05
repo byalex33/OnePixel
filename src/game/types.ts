@@ -74,6 +74,8 @@ export interface LifetimeStats {
 export interface Settings {
   sound: boolean
   music: boolean
+  /** Launch the nuke as soon as it charges. Only offered once NUKE SILO is maxed. */
+  autoNuke: boolean
   shake: boolean
   haptics: boolean
 }

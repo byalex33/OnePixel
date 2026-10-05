@@ -72,6 +72,7 @@ export function sanitizeState(raw: unknown): SaveState {
     out.settings = {
       sound: bool(raw.settings.sound, true),
       music: bool(raw.settings.music, true),
+      autoNuke: bool(raw.settings.autoNuke, true),
       shake: bool(raw.settings.shake, true),
       haptics: bool(raw.settings.haptics, true),
     }

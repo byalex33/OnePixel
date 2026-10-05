@@ -90,30 +90,48 @@ export function NukeControl() {
   const frac = Math.min(1, g.state.nukeCharge / need)
   const ready = g.nukeReady
   const arming = g.nuke !== null
+  const auto = g.state.settings.autoNuke
   return (
-    <button
-      type="button"
-      onClick={() => rt.launchNuke()}
-      disabled={!ready}
-      className={`frame px-shadow pointer-events-auto anim-pop flex w-[176px] items-center gap-2 p-2 pt-3 text-left md:w-[210px] ${
-        ready ? 'border-red' : ''
-      } disabled:cursor-default`}
-    >
-      <span className={`frame-title ${ready || arming ? 'text-red' : ''}`}>NUKE</span>
-      <GiNuclearBomb className={`size-6 shrink-0 ${ready ? 'anim-blink-fast text-red' : arming ? 'text-red' : 'text-dim'}`} />
-      {ready ? (
-        <span className="font-pixel text-[9px] text-red">LAUNCH!</span>
-      ) : arming ? (
-        <span className="anim-blink-fast font-pixel text-[9px] text-red">ARMING</span>
-      ) : (
-        <div className="min-w-0 flex-1">
-          <Segments value={frac} count={10} className="h-2" fill="var(--color-orange)" />
-          <div className="mt-1 font-pixel text-[7px] text-dim">
-            {g.state.nukeCharge}/{need} KILLS
+    <div className="flex items-stretch gap-2">
+      <button
+        type="button"
+        onClick={() => rt.launchNuke()}
+        disabled={!ready}
+        className={`frame px-shadow pointer-events-auto anim-pop flex w-[176px] items-center gap-2 p-2 pt-3 text-left md:w-[210px] ${
+          ready ? 'border-red' : ''
+        } disabled:cursor-default`}
+      >
+        <span className={`frame-title ${ready || arming ? 'text-red' : ''}`}>NUKE</span>
+        <GiNuclearBomb className={`size-6 shrink-0 ${ready ? 'anim-blink-fast text-red' : arming ? 'text-red' : 'text-dim'}`} />
+        {ready ? (
+          <span className="font-pixel text-[9px] text-red">LAUNCH!</span>
+        ) : arming ? (
+          <span className="anim-blink-fast font-pixel text-[9px] text-red">ARMING</span>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <Segments value={frac} count={10} className="h-2" fill="var(--color-orange)" />
+            <div className="mt-1 font-pixel text-[7px] text-dim">
+              {g.state.nukeCharge}/{need} KILLS
+            </div>
           </div>
-        </div>
+        )}
+      </button>
+      {g.autoNukeUnlocked && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={auto}
+          aria-label="Auto launch nuke"
+          title={auto ? 'Auto launch is on' : 'Auto launch is off'}
+          onClick={() => rt.setSetting('autoNuke', !auto)}
+          className={`frame px-shadow pointer-events-auto anim-pop flex flex-col items-center justify-center gap-1 px-2.5 pt-3 pb-2 ${auto ? 'border-red' : ''}`}
+        >
+          <span className={`frame-title ${auto ? 'text-red' : ''}`}>AUTO</span>
+          <span className={`font-pixel text-[9px] ${auto ? 'text-red' : 'text-dim'}`}>[{auto ? 'X' : ' '}]</span>
+          <span className={`font-pixel text-[7px] ${auto ? 'text-ink' : 'text-mute'}`}>{auto ? 'ON' : 'OFF'}</span>
+        </button>
       )}
-    </button>
+    </div>
   )
 }
 

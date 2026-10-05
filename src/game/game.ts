@@ -231,6 +231,11 @@ export class Game {
     return this.stats.nukeEnabled && this.state.nukeCharge >= this.stats.nukeKills && !this.nuke
   }
 
+  /** Auto-launch is the reward for maxing NUKE SILO. */
+  get autoNukeUnlocked(): boolean {
+    return this.stats.nukeEnabled && isMaxed(this.state, 'nukeCharge')
+  }
+
   canBuy(id: UpgradeId): boolean {
     return isUnlocked(this.state, id) && !isMaxed(this.state, id) && this.state.pixels >= costOf(id, this.state.upgrades[id])
   }
@@ -334,6 +339,7 @@ export class Game {
     if (this.statsDirty) this.refreshStats()
 
     this.updateCombo(dt)
+    if (this.state.settings.autoNuke && this.autoNukeUnlocked && this.nukeReady) this.launchNuke()
     this.updateNuke(dt)
     this.updatePixels(dt)
     this.updateRespawns(dt)

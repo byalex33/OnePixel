@@ -137,6 +137,7 @@ describe('save files', () => {
     expect(s.achievements).toEqual(['first'])
     expect(s.settings.sound).toBe(true)
     expect(s.settings.music).toBe(true)
+    expect(s.settings.autoNuke).toBe(true)
   })
 
   it('load saves from before the fox was removed', () => {

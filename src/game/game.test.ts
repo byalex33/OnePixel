@@ -486,6 +486,34 @@ describe('combat mechanics', () => {
     expect(g.frenzy).toBeGreaterThan(0)
   })
 
+  it('auto-launches the nuke only once NUKE SILO is maxed and the switch is on', () => {
+    const charged = (level: number, autoNuke: boolean) => {
+      const g = makeGame((s) => {
+        s.level = 12
+        s.upgrades.nukeCharge = level
+        s.settings.autoNuke = autoNuke
+      })
+      g.state.nukeCharge = g.stats.nukeKills
+      return g
+    }
+    const maxed = UPGRADE_MAP.nukeCharge.max
+
+    const notMaxed = charged(maxed - 1, true)
+    expect(notMaxed.autoNukeUnlocked).toBe(false)
+    run(notMaxed, 0.1)
+    expect(notMaxed.nuke).toBeNull()
+
+    const off = charged(maxed, false)
+    expect(off.autoNukeUnlocked).toBe(true)
+    run(off, 0.1)
+    expect(off.nuke).toBeNull()
+
+    const on = charged(maxed, true)
+    const events = run(on, 0.1)
+    expect(on.nuke).not.toBeNull()
+    expect(events.some((e) => e.type === 'nuke-warn')).toBe(true)
+  })
+
   it('pixel rain storms start, spawn falling pixels and end', () => {
     const g = makeGame((s) => {
       s.level = 10
