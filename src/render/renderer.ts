@@ -5,7 +5,7 @@ import type { GameEvent } from '../game/types'
 import { buildField, paintField, sceneryStage, type DotField } from './dotfield'
 import { C_BLUE, C_CYAN, C_DARK, C_GOLD, C_LIGHT, C_MID, C_ORANGE, C_PINK, C_RAINBOW, C_RED, C_VIOLET, C_WHITE, PAL, rainbowHue } from './palette'
 import { Particles } from './particles'
-import { BOMB, CURSOR, drawSprite } from './sprites'
+import { BOMB, CURSOR, drawSprite, MUSHROOM, type Sprite } from './sprites'
 
 interface Ring {
   x: number
@@ -26,6 +26,8 @@ interface FloatText {
   size: number
   t: number
   dur: number
+  /** Drawn instead of text, centred on x/y; `size` sets the scale as for text. */
+  sprite?: { art: Sprite; colors: Record<string, string> }
 }
 
 interface Zap {
@@ -35,6 +37,14 @@ interface Zap {
   y2: number
   t: number
 }
+
+/** A chain jumping between pixels: a jagged bolt, fixed when it spawns. */
+interface Arc {
+  pts: number[]
+  t: number
+}
+
+const ARC_LIFE = 0.2
 
 const FONT = '"Press Start 2P", ui-monospace, monospace'
 const MAX_TEXTS = 40
@@ -85,6 +95,7 @@ export class Renderer {
   private rings: Ring[] = []
   private texts: FloatText[] = []
   private zaps: Zap[] = []
+  private arcs: Arc[] = []
   private flash: { t: number; dur: number; color: string; alpha: number } = { t: 1, dur: 1, color: PAL.white, alpha: 0 }
   private trauma = 0
   private freeze = 0
@@ -111,6 +122,7 @@ export class Renderer {
     this.rings = []
     this.texts = []
     this.zaps = []
+    this.arcs = []
     this.stage = -1
     this.resize(this.cssW, this.cssH, this.dpr, true)
   }
@@ -190,6 +202,9 @@ export class Renderer {
           break
         case 'laser-fire':
           this.laserFire(e.x1, e.y1, e.x2, e.y2)
+          break
+        case 'chain-arc':
+          this.chainArc(e.x1 * this.scale, e.y1 * this.scale, e.x2 * this.scale, e.y2 * this.scale)
           break
         case 'drone-zap':
           this.zaps.push({ x1: e.x1 * this.scale, y1: e.y1 * this.scale, x2: e.x2 * this.scale, y2: e.y2 * this.scale, t: 0 })
@@ -375,6 +390,7 @@ export class Renderer {
       const c = [C_WHITE, C_ORANGE, C_RED, C_GOLD, C_LIGHT][i % 5]
       this.particles.add(x, y, Math.cos(a) * v, Math.sin(a) * v, 0.6 + Math.random() * 1.2, 2 + Math.random() * 4, c, 120)
     }
+    this.icon(cx, cy - 58, MUSHROOM, { '1': PAL.orange, '2': PAL.gold, '3': PAL.red, '4': PAL.white }, 24, 2.2)
     this.text(cx, cy - 20, 'NUKED', PAL.red, 24, 2.2)
     this.text(cx, cy + 16, `+${fmt(amount)}`, PAL.gold, 16, 2.2)
   }
@@ -386,7 +402,7 @@ export class Renderer {
     this.setFlash(PAL.white, 0.18, 0.3)
     this.ring(cx, cy, Math.hypot(this.cssW, this.cssH) * 0.6, 0.8, PAL.white, true, true)
     this.text(cx, cy - 10, 'RAINBOW MODE', this.hue(cx, cy), 18, 1.6)
-    this.text(cx, cy + 16, `x${C.RAINBOW_MULT} EVERYTHING`, PAL.white, 10, 1.6)
+    this.text(cx, cy + 16, `x${this.game.stats.rainbowMult} EVERYTHING`, PAL.white, 10, 1.6)
   }
 
   private hue(x: number, y: number): string {
@@ -463,6 +479,12 @@ export class Renderer {
     this.texts.push({ x, y, text, color, size, t: 0, dur })
   }
 
+  /** A floating sprite that pops, rises and fades exactly like `text`. */
+  private icon(x: number, y: number, art: Sprite, colors: Record<string, string>, size: number, dur: number): void {
+    if (this.texts.length >= MAX_TEXTS) this.texts.shift()
+    this.texts.push({ x, y, text: '', color: '', size, t: 0, dur, sprite: { art, colors } })
+  }
+
   private setFlash(color: string, alpha: number, dur: number): void {
     if (this.flash.t < this.flash.dur && this.flash.alpha * (1 - this.flash.t / this.flash.dur) > alpha) return
     this.flash = { t: 0, dur, color, alpha: this.reducedMotion ? alpha * 0.4 : alpha }
@@ -491,6 +513,8 @@ export class Renderer {
     this.texts = this.texts.filter((t) => t.t < t.dur)
     for (const z of this.zaps) z.t += dt
     this.zaps = this.zaps.filter((z) => z.t < 0.12)
+    for (const a of this.arcs) a.t += dt
+    this.arcs = this.arcs.filter((a) => a.t < ARC_LIFE)
     this.flash.t += dt
     if (this.reveal < 1) this.reveal = Math.min(1, this.reveal + dt / 1.6)
     if (g.nuke) this.trauma = Math.max(this.trauma, 0.25)
@@ -520,6 +544,7 @@ export class Renderer {
     this.drawLasers()
     this.drawDrones()
     this.drawZaps()
+    this.drawArcs()
     this.particles.draw(ctx)
     this.drawRings()
     this.drawTexts()
@@ -833,6 +858,40 @@ export class Renderer {
     ctx.globalAlpha = 1
   }
 
+  private chainArc(x1: number, y1: number, x2: number, y2: number): void {
+    if (this.arcs.length > 40) this.arcs.shift()
+    const len = Math.hypot(x2 - x1, y2 - y1)
+    const segs = Math.max(3, Math.round(len / (this.ps * 2)))
+    const nx = -(y2 - y1) / (len || 1)
+    const ny = (x2 - x1) / (len || 1)
+    const pts: number[] = []
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs
+      const j = i === 0 || i === segs ? 0 : (Math.random() - 0.5) * this.ps * 1.6
+      pts.push(x1 + (x2 - x1) * t + nx * j, y1 + (y2 - y1) * t + ny * j)
+    }
+    this.arcs.push({ pts, t: 0 })
+  }
+
+  private drawArcs(): void {
+    if (this.arcs.length === 0) return
+    const ctx = this.ctx
+    ctx.lineJoin = 'miter'
+    ctx.lineCap = 'square'
+    for (const a of this.arcs) {
+      ctx.globalAlpha = 1 - a.t / ARC_LIFE
+      for (const [color, width] of [[PAL.orange, Math.max(2, this.ps * 0.5)], [PAL.white, 1]] as const) {
+        ctx.strokeStyle = color
+        ctx.lineWidth = width
+        ctx.beginPath()
+        ctx.moveTo(a.pts[0], a.pts[1])
+        for (let i = 2; i < a.pts.length; i += 2) ctx.lineTo(a.pts[i], a.pts[i + 1])
+        ctx.stroke()
+      }
+    }
+    ctx.globalAlpha = 1
+  }
+
   private drawRings(): void {
     const ctx = this.ctx
     for (const r of this.rings) {
@@ -867,6 +926,17 @@ export class Renderer {
       ctx.strokeStyle = PAL.bg
       const x = Math.round(t.x)
       const y = Math.round(t.y - rise)
+      if (t.sprite) {
+        const { art, colors } = t.sprite
+        const bit = Math.max(1, Math.round((t.size * pop) / 8))
+        const left = x - (art[0].length * bit) / 2
+        const top = y - (art.length * bit) / 2
+        // Dark outline (like the text stroke) so it reads over the white flash.
+        const outline = Object.fromEntries(Object.keys(colors).map((k) => [k, PAL.bg]))
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) drawSprite(ctx, art, left + dx * bit, top + dy * bit, bit, outline)
+        drawSprite(ctx, art, left, top, bit, colors)
+        continue
+      }
       ctx.strokeText(t.text, x, y)
       ctx.fillStyle = t.color
       ctx.fillText(t.text, x, y)

@@ -26,8 +26,10 @@ export const blastRadius = (l: number) => (l <= 0 ? 0 : 9 + 3 * n(l))
 export const blueChance = (l: number) => (l <= 0 ? 0 : Math.min(0.15, 0.05 + 0.01 * n(l)))
 export const goldenChance = (l: number) => (l <= 0 ? 0 : Math.min(0.25, 0.04 + 0.015 * n(l)))
 export const rainbowInterval = (l: number) => (l <= 0 ? Infinity : 40 * Math.pow(0.9, n(l)))
-export const rainbowDuration = (l: number) => 2 + 0.25 * n(l)
-export const chainChance = (l: number) => (l <= 0 ? 0 : Math.min(0.55, 0.06 + 0.05 * n(l)))
+export const rainbowDuration = (l: number) => 2.5 + 0.375 * n(l)
+/** Rainbow mode payout: x10 at level 1, x30 at max (it has to compete with the nuke). */
+export const rainbowMult = (l: number) => (l <= 0 ? 1 : Math.round(10 + 2.5 * n(l)))
+export const chainChance = (l: number) => (l <= 0 ? 0 : Math.min(0.6, 0.12 + 0.05 * n(l)))
 export const bombInterval = (l: number) => (l <= 0 ? Infinity : 14 * Math.pow(0.88, n(l)))
 export const bombRadius = (l: number) => 24 + 2 * n(l)
 export const rainInterval = (l: number) => 75 * Math.pow(0.9, n(l))
@@ -46,8 +48,8 @@ export const bossBonus = (kills: number) => 1 + 0.05 * kills
 /** Armor piercing: boss damage multiplier. */
 export const pierceMult = (l: number) => 1 + 0.25 * l
 
-/** XP needed to go from `level` to `level + 1`. */
-export const xpToNext = (level: number) => Math.round(10 * Math.pow(2.0, level - 1))
+/** XP needed to go from `level` to `level + 1`: doubles each level, easing to x1.75 from level 12 so the late game doesn't stall. */
+export const xpToNext = (level: number) => Math.round(10 * Math.pow(2.0, Math.min(level, 11) - 1) * Math.pow(1.75, Math.max(0, level - 11)))
 
 export const upgradeCost = (base: number, growth: number, level: number) =>
   Math.floor(base * Math.pow(growth, level))
@@ -71,6 +73,7 @@ export interface Stats {
   /** Seconds between rainbow pixels, and how long rainbow mode lasts. */
   rainbowInterval: number
   rainbowDuration: number
+  rainbowMult: number
   chainChance: number
   bombInterval: number
   bombRadius: number
@@ -109,6 +112,7 @@ export function computeStats(s: SaveState): Stats {
     blueChance: u.blue > 0 && s.level >= BLUE_LEVEL ? blueChance(u.blue) : 0,
     rainbowInterval: has('rainbow', 'rainbow') ? rainbowInterval(u.rainbow) : Infinity,
     rainbowDuration: rainbowDuration(u.rainbow),
+    rainbowMult: rainbowMult(u.rainbow),
     chainChance: has('chain', 'chain') ? chainChance(u.chain) : 0,
     bombInterval: has('bomb', 'bomb') ? bombInterval(u.bomb) * oc : Infinity,
     bombRadius: bombRadius(u.bomb),

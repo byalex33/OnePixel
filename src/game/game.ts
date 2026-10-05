@@ -69,6 +69,8 @@ interface PendingBlast {
   depth: number
   /** A cluster bomblet rather than a full bomb. */
   mini?: boolean
+  /** The pixel a chain jumped to; the blast follows it if it moves. */
+  target?: Pixel
 }
 
 export interface Boss {
@@ -102,8 +104,8 @@ export interface Rect {
 }
 
 const MAX_EVENTS = 800
-/** Golden and rainbow pixels are left for the player. */
-const droneCanTake = (p: Pixel) => p.kind !== 'golden' && p.kind !== 'rainbow'
+/** Golden and rainbow pixels are left for the player: drones, chains and the boss skip them. */
+const autoCanTake = (p: Pixel) => p.kind !== 'golden' && p.kind !== 'rainbow'
 /** Drone target id meaning "the boss" rather than a pixel. */
 const BOSS_TARGET = -1
 const EARN_BINS = 10
@@ -135,7 +137,7 @@ export class Game {
   nuke: { t: number } | null = null
   boss: Boss | null = null
   frenzy = 0
-  /** Seconds of rainbow mode left; every pixel pays x5 while it runs. */
+  /** Seconds of rainbow mode left; every pixel pays `stats.rainbowMult` while it runs. */
   rainbow = 0
   rainbowTimer: number
   bombTimer: number
@@ -391,7 +393,7 @@ export class Game {
       st.blueKills++
     }
     if (p.kind === 'rainbow') this.startRainbow()
-    if (this.rainbow > 0) amount *= C.RAINBOW_MULT
+    if (this.rainbow > 0) amount *= s.rainbowMult
     const crit = s.critChance > 0 && this.rng.chance(s.critChance)
     if (crit) {
       amount *= s.critMult
@@ -428,8 +430,7 @@ export class Game {
     if (p.slot) this.queueRespawn()
 
     if (cause !== 'nuke' && s.chainChance > 0 && depth < C.CHAIN_MAX_DEPTH && this.rng.chance(s.chainChance)) {
-      const chainGroup = cause === 'chain' ? group : this.newGroup('chain')
-      this.blasts.push({ x: p.x, y: p.y, r: C.CHAIN_RADIUS, delay: C.CHAIN_DELAY, cause: 'chain', group: chainGroup, depth: depth + 1 })
+      this.chainFrom(p, cause === 'chain' ? group : null, depth + 1)
     }
 
     this.emit({ type: 'pop', x: p.x, y: p.y, kind: p.kind, amount, xp, crit, cause, combo: this.combo.count })
@@ -503,6 +504,38 @@ export class Game {
         this.revision++
       }
     }
+  }
+
+  /**
+   * A chain jumps from a destroyed pixel to the nearest pixel within reach (or
+   * the boss) and detonates there. With nothing in reach it fizzles.
+   */
+  private chainFrom(from: Pixel, group: number | null, depth: number): void {
+    const claimed = new Set(this.blasts.map((b) => b.target))
+    let target: Pixel | undefined
+    let best = C.CHAIN_JUMP
+    for (const q of this.pixels) {
+      if (q.dead || !autoCanTake(q) || claimed.has(q)) continue
+      const d = Math.hypot(q.x - from.x, q.y - from.y)
+      if (d < best) {
+        best = d
+        target = q
+      }
+    }
+    let x: number
+    let y: number
+    if (target) {
+      x = target.x
+      y = target.y
+    } else {
+      const b = this.fightingBoss()
+      if (!b) return
+      x = Math.max(b.x - b.r, Math.min(from.x, b.x + b.r))
+      y = Math.max(b.y - b.r, Math.min(from.y, b.y + b.r))
+      if (Math.hypot(x - from.x, y - from.y) > C.CHAIN_JUMP) return
+    }
+    this.emit({ type: 'chain-arc', x1: from.x, y1: from.y, x2: x, y2: y })
+    this.blasts.push({ x, y, r: C.CHAIN_RADIUS, delay: C.CHAIN_DELAY, cause: 'chain', group: group ?? this.newGroup('chain'), depth, target })
   }
 
   private newGroup(cause: Cause): number {
@@ -701,13 +734,13 @@ export class Game {
       if (d.cooldown > 0) d.cooldown -= dt
       let onBoss = boss !== null && d.targetId === BOSS_TARGET
       let target = d.targetId !== null && !onBoss ? byId.get(d.targetId) : undefined
-      if (!onBoss && (!target || !droneCanTake(target))) {
+      if (!onBoss && (!target || !autoCanTake(target))) {
         if (d.targetId !== null) claimed.delete(d.targetId)
         target = undefined
         d.targetId = null
         let best = Infinity
         for (const p of byId.values()) {
-          if (!droneCanTake(p) || claimed.has(p.id) || p.age < 0.15) continue
+          if (!autoCanTake(p) || claimed.has(p.id) || p.age < 0.15) continue
           const dist = Math.hypot(p.x - d.x, p.y - d.y)
           if (dist < best) {
             best = dist
@@ -852,10 +885,15 @@ export class Game {
     }
     this.blasts = later
     for (const b of due) {
+      if (b.target && !b.target.dead) {
+        b.x = b.target.x
+        b.y = b.target.y
+      }
       this.emit({ type: 'blast', x: b.x, y: b.y, r: b.r, cause: b.cause })
       const reach = b.r + C.PIXEL_SIZE / 2
       for (const p of this.pixels) {
-        if (!p.dead && Math.hypot(p.x - b.x, p.y - b.y) <= reach) this.destroy(p, b.cause, b.group, 1, b.depth)
+        if (p.dead || (b.cause === 'chain' && !autoCanTake(p))) continue
+        if (Math.hypot(p.x - b.x, p.y - b.y) <= reach) this.destroy(p, b.cause, b.group, 1, b.depth)
       }
       if ((b.cause === 'bomb' || b.cause === 'chain') && this.bossTouches(b.x, b.y, b.r)) {
         this.hitBoss(b.cause === 'chain' ? 'chain' : b.mini ? 'bomblet' : 'bomb', b.x, b.y)
@@ -1104,7 +1142,7 @@ export class Game {
     let prey: Pixel | null = null
     let preyDist = Infinity
     for (const p of this.pixels) {
-      if (p.dead || !droneCanTake(p)) continue
+      if (p.dead || !autoCanTake(p)) continue
       const d = Math.hypot(p.x - b.x, p.y - b.y)
       if (d < preyDist) {
         preyDist = d

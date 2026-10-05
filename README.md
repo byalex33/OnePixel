@@ -84,7 +84,7 @@ Controls: click or tap pixels. Tap a bomb to detonate it early. Tap an upgrade t
 - Critical hits, combos, explosive taps and chain reactions
 - Blue pixels: worth x10 XP, for when you want the next level sooner
 - Golden pixels: rare, fleeting, worth x25, and the drones cannot catch them
-- Rainbow mode: pop a rainbow pixel and every pixel pays x5 for a few seconds, while the arena and balance box light up like an RGB keyboard
+- Rainbow mode: pop a rainbow pixel and every pixel pays x10 (up to x30 with upgrades) for a few seconds, while the arena and balance box light up like an RGB keyboard
 - Auto-destroyer drones that fly to pixels and click them
 - Bombs that drop into crowds, orbital lasers, pixel rain storms and a nuke that wipes the board
 
@@ -138,7 +138,7 @@ Levels unlock **mechanics**, not stat bumps. Reaching a level stocks the shop; y
 | 14 | Cluster bombs | Bombs scatter bomblets. |
 | 15 | Twin lasers | Two beams per strike. |
 | 16 | Golden storms | Pixel rain carries golden pixels. |
-| 17 | Rainbow mode | Rare rainbow pixels; pop one and every pixel pays x5 for a few seconds. |
+| 17 | Rainbow mode | Rare rainbow pixels; pop one and every pixel pays x10 or more for a few seconds. |
 | 18 | Overclock | Every machine runs 25% faster. |
 | 20 | ??? | To be continued. |
 

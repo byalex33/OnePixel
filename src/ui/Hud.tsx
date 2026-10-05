@@ -1,5 +1,5 @@
 import { GiNuclearBomb } from 'react-icons/gi'
-import { BOSS_NAME, COMBO_WINDOW, RAINBOW_MULT } from '../game/config'
+import { BOSS_NAME, COMBO_WINDOW } from '../game/config'
 import { fmt, fmtTime } from '../game/format'
 import { comboMult, xpToNext } from '../game/formulas'
 import { useRuntime } from './hooks'
@@ -16,7 +16,7 @@ export function BalanceBox({ ref }: { ref: React.Ref<HTMLDivElement> }) {
     <div ref={ref} className="frame px-shadow anim-boot absolute top-3 right-3 w-[176px] p-2.5 pt-3.5 md:w-[244px] md:p-3 md:pt-4">
       {rainbow && <span className="rainbow-ring" aria-hidden="true" />}
       <span className="frame-title">BALANCE</span>
-      {rainbow && <span className="frame-title rainbow-text right-2 left-auto">x{RAINBOW_MULT} RAINBOW</span>}
+      {rainbow && <span className="frame-title rainbow-text right-2 left-auto">x{rt.game.stats.rainbowMult} RAINBOW</span>}
       <div className="flex items-center gap-2">
         <span className="inline-block size-2.5 shrink-0 bg-hi md:size-3" />
         <span className="truncate font-pixel text-[14px] text-hi md:text-[20px]">{fmt(s.pixels)}</span>

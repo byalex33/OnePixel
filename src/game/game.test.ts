@@ -334,7 +334,7 @@ describe('combat mechanics', () => {
     expect(g.pixels.filter((p) => p.kind === 'rainbow')).toHaveLength(1)
   })
 
-  it('popping a rainbow pixel makes every pixel pay x5 until rainbow mode ends', () => {
+  it('popping a rainbow pixel makes every pixel pay the rainbow multiplier until rainbow mode ends', () => {
     const g = makeGame((s) => {
       s.level = 17
       s.upgrades.rainbow = 1
@@ -348,11 +348,12 @@ describe('combat mechanics', () => {
     const start = g.drainEvents()
     expect(start.some((e) => e.type === 'rainbow-start')).toBe(true)
     expect(g.rainbow).toBeCloseTo(F.rainbowDuration(1))
-    expect(g.state.pixels).toBeCloseTo(value * C.RAINBOW_MULT)
+    expect(F.rainbowMult(1)).toBe(10)
+    expect(g.state.pixels).toBeCloseTo(value * F.rainbowMult(1))
 
     const p = addPixel(g, 180, 100)
     g.pointerDown(p.x, p.y)
-    expect(g.state.pixels).toBeCloseTo(value * C.RAINBOW_MULT * 2)
+    expect(g.state.pixels).toBeCloseTo(value * F.rainbowMult(1) * 2)
 
     const events = run(g, F.rainbowDuration(1) + 0.1)
     expect(events.some((e) => e.type === 'rainbow-end')).toBe(true)
@@ -424,6 +425,43 @@ describe('combat mechanics', () => {
       run(g, 1)
     }
     expect(g.state.stats.chainKills).toBeGreaterThan(0)
+  })
+
+  it('chains jump to the nearest pixel in reach, skipping golden ones', () => {
+    const g = makeGame((s) => {
+      s.level = 8
+      s.upgrades.chain = 11
+    }, 3)
+    const chainP = F.chainChance(11)
+    g.rng.chance = (p) => p === chainP
+    g.pixels = []
+    const first = addPixel(g, 40, 80)
+    const gold = addPixel(g, 60, 80, 'golden') // nearer, but chains leave it for the player
+    const near = addPixel(g, 40 + C.CHAIN_JUMP - 4, 80)
+    const far = addPixel(g, near.x + C.CHAIN_JUMP + 10, 80) // out of reach of the next hop
+    g.pointerDown(first.x, first.y)
+    const events = run(g, 0.2)
+    expect(near.dead).toBe(true)
+    expect(gold.dead).toBe(false)
+    expect(far.dead).toBe(false)
+    expect(events.filter((e) => e.type === 'chain-arc')).toHaveLength(1)
+  })
+
+  it('a lucky chain can hop along a whole line and earn CHAIN GANG', () => {
+    const g = makeGame((s) => {
+      s.level = 8
+      s.upgrades.chain = 11
+    }, 3)
+    const chainP = F.chainChance(11)
+    g.rng.chance = (p) => p === chainP
+    g.pixels = []
+    // Spaced wider than a blast, so only jumping can reach them.
+    const line = Array.from({ length: 8 }, (_, i) => addPixel(g, 20 + i * 28, 80))
+    g.pointerDown(line[0].x, line[0].y)
+    run(g, 1.5) // achievements are checked twice a second
+    expect(line.every((p) => p.dead)).toBe(true)
+    expect(g.state.stats.bestChain).toBe(7)
+    expect(g.state.achievements).toContain('chain')
   })
 
   it('the nuke wipes every pixel, pays the yield and starts fallout', () => {

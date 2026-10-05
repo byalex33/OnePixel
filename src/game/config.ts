@@ -26,9 +26,8 @@ export const GOLDEN_LIFETIME = 5.5
 export const GOLDEN_MULT = 25
 export const GOLDEN_XP_MULT = 5
 
-/** Rainbow pixels: pop one and every pixel pays x5 while rainbow mode lasts. */
+/** Rainbow pixels: pop one and every pixel pays extra (see `rainbowMult`) while rainbow mode lasts. */
 export const RAINBOW_LIFETIME = 4.5
-export const RAINBOW_MULT = 5
 
 export const BOMB_FUSE = 1.1
 export const BOMBLET_FUSE = 0.45
@@ -37,6 +36,8 @@ export const BOMBLET_RADIUS = 13
 export const CHAIN_RADIUS = 13
 export const CHAIN_DELAY = 0.085
 export const CHAIN_MAX_DEPTH = 14
+/** How far a chain can jump to reach its next pixel. */
+export const CHAIN_JUMP = 48
 
 export const LASER_CHARGE = 0.45
 export const LASER_FIRE = 0.28

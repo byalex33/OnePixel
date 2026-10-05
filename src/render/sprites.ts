@@ -24,6 +24,24 @@ export const BOMB: Sprite = [
   '.111..',
 ]
 
+/** Mushroom cloud shown above "NUKED". 1 fire, 2 hot top, 3 shadow, 4 stem. */
+export const MUSHROOM: Sprite = [
+  '....22222....',
+  '..221111122..',
+  '.21111111112.',
+  '2111111111112',
+  '3111111111113',
+  '.33311111333.',
+  '....33133....',
+  '.....414.....',
+  '...3341433...',
+  '.....414.....',
+  '.....414.....',
+  '...1144411...',
+  '.11111111111.',
+  '3333333333333',
+]
+
 export function drawSprite(
   ctx: CanvasRenderingContext2D,
   sprite: Sprite,

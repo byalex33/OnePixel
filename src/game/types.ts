@@ -120,6 +120,7 @@ export type GameEvent =
   | { type: 'bomb-drop'; x: number; y: number }
   | { type: 'laser-fire'; x1: number; y1: number; x2: number; y2: number }
   | { type: 'drone-zap'; x1: number; y1: number; x2: number; y2: number }
+  | { type: 'chain-arc'; x1: number; y1: number; x2: number; y2: number }
   | { type: 'expire'; x: number; y: number; kind: PixelKind }
   | { type: 'rainbow-start'; duration: number }
   | { type: 'rainbow-end' }
