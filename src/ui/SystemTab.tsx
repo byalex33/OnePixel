@@ -3,6 +3,7 @@ import { GiMusicalNotes, GiSave, GiSpeaker, GiSpeakerOff } from 'react-icons/gi'
 import { fmt, fmtTime } from '../game/format'
 import { SaveError } from '../game/save'
 import type { Settings } from '../game/types'
+import { Credits } from './Credits'
 import { useRuntime } from './hooks'
 
 const btn = 'border-2 border-line px-2 py-2 font-pixel text-[8px] text-ink hover:border-hi hover:text-hi active:bg-hi active:text-bg'
@@ -27,6 +28,7 @@ export function SystemTab() {
   const [importText, setImportText] = useState('')
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
   const [confirm, setConfirm] = useState<'import' | 'reset' | null>(null)
+  const [credits, setCredits] = useState(false)
 
   const doExport = async () => {
     const c = rt.exportCode()
@@ -65,8 +67,10 @@ export function SystemTab() {
     ['BY LASERS', fmt(st.laserKills)],
     ['BY CHAINS', fmt(st.chainKills)],
     ['NUKES', fmt(st.nukes)],
-    ['BOSSES', `${fmt(st.bossKills)} / ${fmt(st.bossKills + st.bossEscapes)}`],
   ]
+  // Kept secret (like the boss feats) until the first boss has surfaced.
+  const bossesMet = st.bossKills + st.bossEscapes
+  if (bossesMet > 0) rows.push(['BOSSES', `${fmt(st.bossKills)} / ${fmt(bossesMet)}`])
 
   return (
     <div className="space-y-4">
@@ -127,6 +131,14 @@ export function SystemTab() {
             </div>
           ))}
         </dl>
+      </section>
+
+      <section className="frame p-3 pt-4">
+        <span className="frame-title">ABOUT</span>
+        <button type="button" className={`${btn} w-full`} onClick={() => setCredits(true)}>
+          CREDITS
+        </button>
+        {credits && <Credits onClose={() => setCredits(false)} />}
       </section>
 
       <section className="frame border-red/40 p-3 pt-4">
