@@ -20,7 +20,7 @@ export interface BotResult {
 
 /**
  * A crude stand-in for an engaged human, used to sanity-check pacing.
- * It taps the oldest reachable pixel (golden first), buys the cheapest
+ * It taps the oldest reachable pixel (golden and rainbow first, then blue), buys the cheapest
  * affordable upgrade, and launches nukes as soon as they are ready.
  */
 export function runBot(opts: BotOptions): BotResult {
@@ -38,8 +38,8 @@ export function runBot(opts: BotOptions): BotResult {
     clickCd -= DT
     if (clickCd <= 0) {
       const candidates = g.pixels.filter((p) => !p.dead && p.age >= opts.reaction && p.y > 0)
-      const golden = candidates.find((p) => p.kind === 'golden')
-      const target = golden ?? candidates.sort((a, b) => b.age - a.age)[0]
+      const special = candidates.find((p) => p.kind === 'golden' || p.kind === 'rainbow') ?? candidates.find((p) => p.kind === 'blue')
+      const target = special ?? candidates.sort((a, b) => b.age - a.age)[0]
       if (target) {
         g.pointerDown(target.x, target.y)
         clickCd = 1 / opts.cps

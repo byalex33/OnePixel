@@ -88,6 +88,50 @@
   }
 }
 
+/* Rainbow mode: an RGB-keyboard border that spins round the balance box. */
+@property --rainbow-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes rainbow-spin {
+  to {
+    --rainbow-angle: 360deg;
+  }
+}
+@keyframes rainbow-text {
+  0%,
+  100% {
+    color: #ff4d3d;
+  }
+  16% {
+    color: #ffcc33;
+  }
+  33% {
+    color: #5dff6a;
+  }
+  50% {
+    color: #5ee6ff;
+  }
+  66% {
+    color: #4d7cff;
+  }
+  83% {
+    color: #b45dff;
+  }
+}
+.rainbow-ring {
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  border: 2px solid transparent;
+  border-image: conic-gradient(from var(--rainbow-angle), #ff4d3d, #ff9a2e, #ffcc33, #5dff6a, #5ee6ff, #4d7cff, #b45dff, #ff77a8, #ff4d3d) 1;
+  animation: rainbow-spin 0.9s linear infinite;
+}
+.rainbow-text {
+  animation: rainbow-text 0.9s linear infinite;
+}
+
 @keyframes blink {
   50% {
     opacity: 0;
@@ -250,7 +294,9 @@
   }
   .anim-blink,
   .anim-blink-fast,
-  .anim-jolt {
+  .anim-jolt,
+  .rainbow-ring,
+  .rainbow-text {
     animation: none;
   }
 }

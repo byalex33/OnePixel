@@ -177,6 +177,11 @@ export class Runtime {
         case 'nuke-warn':
         case 'rain-start':
         case 'rain-end':
+        case 'rainbow-end':
+          urgent = true
+          break
+        case 'rainbow-start':
+          this.buzz([15, 30, 15, 30, 15])
           urgent = true
           break
         case 'nuke':
@@ -187,7 +192,7 @@ export class Runtime {
           if (e.cause === 'bomb') this.buzz(25)
           break
         case 'pop':
-          if (e.crit || e.kind === 'golden') this.buzz(12)
+          if (e.crit || e.kind === 'golden' || e.kind === 'rainbow') this.buzz(12)
           break
       }
     }

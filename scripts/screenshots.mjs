@@ -31,7 +31,7 @@ const MOBILE = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }
 
 // ------------------------------------------------------------------ save data
 
-const ALL_SEEN = ['respawn', 'value', 'multi', 'critChance', 'critPower', 'fox', 'combo', 'xp', 'blast', 'auto', 'golden', 'chain', 'bomb', 'rain', 'laser', 'nukeCharge', 'nukeYield', 'swarm']
+const ALL_SEEN = ['respawn', 'value', 'multi', 'critChance', 'critPower', 'blue', 'combo', 'xp', 'blast', 'auto', 'golden', 'chain', 'bomb', 'rain', 'laser', 'nukeCharge', 'nukeYield', 'swarm']
 
 function saveFile(state) {
   const now = Date.now()
@@ -43,9 +43,9 @@ const EARLY = {
   totalPixels: 900,
   xp: 30,
   level: 4,
-  upgrades: { respawn: 3, value: 3, multi: 3, critChance: 1, fox: 1 },
+  upgrades: { respawn: 3, value: 3, multi: 3, critChance: 1 },
   achievements: ['first', 'shop', 'crit'],
-  seenUpgrades: ['respawn', 'value', 'multi', 'critChance', 'fox'],
+  seenUpgrades: ['respawn', 'value', 'multi', 'critChance'],
   stats: { kills: 120, clicks: 130, manualKills: 120, crits: 4, mostOnScreen: 4 },
   reveal: { hud: true, panel: true },
 }
@@ -56,12 +56,12 @@ const MID = {
   xp: 30000,
   level: 13,
   upgrades: {
-    respawn: 10, value: 18, multi: 10, critChance: 8, critPower: 6, fox: 4, combo: 5, xp: 8,
+    respawn: 10, value: 18, multi: 10, critChance: 8, critPower: 6, blue: 4, combo: 5, xp: 8,
     blast: 6, auto: 7, golden: 5, chain: 5, bomb: 5, rain: 3, laser: 4, nukeCharge: 2, nukeYield: 2, swarm: 1,
   },
-  achievements: ['first', 'shop', 'k100', 'k1k', 'clicks', 'crit', 'combo10', 'crowd', 'drone', 'multi', 'fox', 'gold', 'chain', 'bomb', 'laser', 'lvl10'],
+  achievements: ['first', 'shop', 'k100', 'k1k', 'clicks', 'crit', 'combo10', 'crowd', 'drone', 'multi', 'blue', 'gold', 'chain', 'bomb', 'laser', 'lvl10'],
   seenUpgrades: ALL_SEEN,
-  stats: { kills: 6400, clicks: 2100, manualKills: 1900, crits: 900, goldenKills: 40, droneKills: 2500, foxKills: 300, maxCombo: 24, mostOnScreen: 14 },
+  stats: { kills: 6400, clicks: 2100, manualKills: 1900, crits: 900, goldenKills: 40, blueKills: 60, droneKills: 2500, maxCombo: 24, mostOnScreen: 14 },
   nukeCharge: 120,
   rainTimer: 40,
   reveal: { hud: true, panel: true },
@@ -170,7 +170,7 @@ async function scenes(page) {
   await page.eval(PLAY(3500))
   await page.shoot('early-game')
 
-  // 3. Mid game: drones, fox, scenery, then catch a bomb going off.
+  // 3. Mid game: drones, scenery, then catch a bomb going off.
   await page.load(MID)
   await sleep(5000)
   await page.eval(`
@@ -184,36 +184,13 @@ async function scenes(page) {
   await sleep(40)
   await page.shoot('mid-game')
 
-  // 4. The levels tab, with upcoming unlocks hidden behind ???.
-  await page.eval(`document.querySelectorAll('[role=tab]')[1].click(); return true`)
-  await sleep(300)
-  await page.shoot('levels-tab', { x: 0, y: 0, width: 348, height: 800 })
-  await page.eval(`document.querySelectorAll('[role=tab]')[0].click(); return true`)
-
-  // 5. A level-up.
+  // 4. A level-up.
   await page.eval(`const g = op.game; g.grant(0, 70000); return true`)
   await sleep(650)
   await page.shoot('level-up')
   await sleep(3500)
 
-  // 6. The fox mid-leap, then the catch with its little heart.
-  await page.eval(`
-    const g = op.game, f = g.fox
-    for (let i = 0; i < 400 && f.phase !== 'sit' && f.phase !== 'walk'; i++) await new Promise(r => setTimeout(r, 16))
-    g.pixels.push({ id: 999999, x: f.x + 28, y: f.groundY - 32, vy: 0, kind: 'golden', slot: false, age: 1, life: 99, dead: false })
-    f.cooldown = 0
-    for (let i = 0; i < 200; i++) {
-      await new Promise(r => setTimeout(r, 8))
-      if (f.phase === 'out' && f.t > f.dur * 0.55) break
-    }
-    return true`)
-  const foxClip = await page.eval(`
-    const f = op.game.fox, s = op.renderer.scale, main = document.querySelector('main').getBoundingClientRect()
-    return { x: Math.max(0, Math.min(innerWidth - 340, main.left + f.x * s - 170)), y: Math.max(0, main.top + f.groundY * s - 210), width: 340, height: 240 }`)
-  if (process.env.DEBUG_SHOTS) console.log('  fox clip', foxClip, await page.eval(`const f = op.game.fox; return { x: f.x, y: f.y, g: f.groundY, phase: f.phase, s: op.renderer.scale }`))
-  await page.shoot('fox-leap', { ...foxClip, scale: 2 })
-
-  // 7. The nuke: warning, then detonation.
+  // 5. The nuke: warning, then detonation.
   await page.eval(`op.game.state.nukeCharge = op.game.stats.nukeKills; op.launchNuke(); return true`)
   await page.eval(`
     for (let i = 0; i < 100; i++) {

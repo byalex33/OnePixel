@@ -14,7 +14,7 @@ export interface DotField {
   oy: number
   /** 0..1 brightness per dot, row-major. */
   v: Float32Array
-  /** Grid row of the ground line, once the ground exists (the fox walks along it). */
+  /** Grid row of the ground line, once the ground exists. */
   ground: number | null
 }
 

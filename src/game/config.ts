@@ -15,16 +15,9 @@ export const MIN_SPAWN_DIST = 11
 /** The upgrade shop opens at this level. Before that it is just you and the pixel. */
 export const UPGRADES_UNLOCK_LEVEL = 2
 
-/** The fox moves in when the ground appears (first scenery stage). */
-export const FOX_LEVEL = 3
-/** Seconds for each leg of a fox leap (out to the pixel, then back home), scaled by distance. */
-export const FOX_LEG_MIN = 0.35
-export const FOX_LEG_MAX = 0.75
-export const FOX_CATCH_RADIUS = 8
-/** Wandering: walking speed (world units/s) and how long it sits between strolls. */
-export const FOX_WALK_SPEED = 16
-export const FOX_REST_MIN = 1.2
-export const FOX_REST_MAX = 3.5
+/** Blue pixels are an XP treat; they hit the shop at the first scenery stage. */
+export const BLUE_LEVEL = 3
+export const BLUE_XP_MULT = 10
 
 export const COMBO_WINDOW = 1.6
 export const COMBO_STEP = 0.03
@@ -32,6 +25,10 @@ export const COMBO_STEP = 0.03
 export const GOLDEN_LIFETIME = 5.5
 export const GOLDEN_MULT = 25
 export const GOLDEN_XP_MULT = 5
+
+/** Rainbow pixels: pop one and every pixel pays x5 while rainbow mode lasts. */
+export const RAINBOW_LIFETIME = 4.5
+export const RAINBOW_MULT = 5
 
 export const BOMB_FUSE = 1.1
 export const BOMBLET_FUSE = 0.45

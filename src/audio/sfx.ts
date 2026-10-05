@@ -10,6 +10,7 @@ export type Cue =
   | 'pop-auto'
   | 'crit'
   | 'gold'
+  | 'blue'
   | 'miss'
   | 'bomb'
   | 'chain'
@@ -21,7 +22,7 @@ export type Cue =
   | 'buy'
   | 'denied'
   | 'rain'
-  | 'fox'
+  | 'rainbow'
 
 interface CueOpts {
   pitch?: number
@@ -87,6 +88,9 @@ export class Sfx {
       case 'gold':
         ;[1047, 1319, 1568, 2093].forEach((f, i) => this.tone('square', f, f, 0.07, 0.3, i * 0.05))
         break
+      case 'blue':
+        ;[880, 1319, 1760].forEach((f, i) => this.tone('triangle', f, f * 1.01, 0.09, 0.32, i * 0.05))
+        break
       case 'miss':
         this.tone('triangle', 180, 120, 0.05, 0.2)
         break
@@ -119,12 +123,11 @@ export class Sfx {
       case 'denied':
         this.tone('square', 150, 110, 0.1, 0.3)
         break
-      case 'fox':
-        this.tone('triangle', 1250, 1700, 0.05, 0.35)
-        this.tone('triangle', 1700, 2300, 0.06, 0.3, 0.06)
-        break
       case 'rain':
         ;[1568, 1319, 1047, 784].forEach((f, i) => this.tone('triangle', f, f, 0.1, 0.25, i * 0.09))
+        break
+      case 'rainbow':
+        ;[523, 659, 784, 988, 1175, 1319, 1568, 2093].forEach((f, i) => this.tone('square', f, f * 1.02, 0.08, 0.28, i * 0.04))
         break
     }
   }
@@ -166,8 +169,8 @@ export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
   switch (e.type) {
     case 'pop':
       if (e.kind === 'golden') return { cue: 'gold' }
+      if (e.kind === 'blue') return { cue: 'blue' }
       if (e.crit) return { cue: 'crit' }
-      if (e.cause === 'fox') return { cue: 'fox' }
       if (e.cause === 'click') return { cue: 'pop', opts: { pitch: 1 + Math.min(e.combo, 30) * 0.03 } }
       if (e.cause === 'drone' || e.cause === 'laser') return { cue: 'pop-auto', opts: { pitch: 0.9 + Math.random() * 0.3 } }
       return null
@@ -193,6 +196,8 @@ export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
       return { cue: 'denied' }
     case 'rain-start':
       return { cue: 'rain' }
+    case 'rainbow-start':
+      return { cue: 'rainbow' }
     default:
       return null
   }

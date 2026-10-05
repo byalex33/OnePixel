@@ -1,4 +1,4 @@
-import { FOX_LEG_MAX, LASER_WIDTH, MAX_OFFLINE_SECONDS, OFFLINE_EFFICIENCY, PIXEL_SIZE, WORLD_AREA } from './config'
+import { LASER_WIDTH, MAX_OFFLINE_SECONDS, OFFLINE_EFFICIENCY, PIXEL_SIZE, WORLD_AREA } from './config'
 import { computeStats, type Stats } from './formulas'
 import type { SaveState } from './types'
 
@@ -20,7 +20,7 @@ export function offlineSeconds(now: number, savedAt: number, maxSeenAt: number):
 
 /**
  * Steady-state kills/second from automation only (drones, bombs, lasers).
- * Manual play, golden pixels, combos and storms are deliberately excluded:
+ * Manual play, golden and blue pixels, combos and storms are deliberately excluded:
  * offline progress should never beat playing.
  */
 export function automationKillRate(st: Stats, area = WORLD_AREA): number {
@@ -35,9 +35,7 @@ export function automationKillRate(st: Stats, area = WORLD_AREA): number {
   const laserRate = Number.isFinite(st.laserInterval)
     ? (st.laserBeams / st.laserInterval) * Math.max(1, density * (LASER_WIDTH + PIXEL_SIZE) * side * 1.2)
     : 0
-  // The fox only reaches part of the arena, so count it at half its leap rate.
-  const foxRate = st.foxEnabled ? 0.5 / (st.foxCooldown + 2 * FOX_LEG_MAX) : 0
-  return Math.min(spawnCap, droneRate + bombRate + laserRate + foxRate)
+  return Math.min(spawnCap, droneRate + bombRate + laserRate)
 }
 
 export interface OfflineGains {

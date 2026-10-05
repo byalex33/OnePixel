@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as C from './config'
+import * as F from './formulas'
 import { xpToNext } from './formulas'
 import { Game, type Pixel } from './game'
 import { createInitialState } from './state'
@@ -25,7 +26,7 @@ function run(g: Game, seconds: number): GameEvent[] {
 }
 
 function addPixel(g: Game, x: number, y: number, kind: Pixel['kind'] = 'normal'): Pixel {
-  const p: Pixel = { id: 10_000 + g.pixels.length, x, y, vy: 0, kind, slot: false, age: 1, life: kind === 'golden' ? 99 : Infinity, dead: false }
+  const p: Pixel = { id: 10_000 + g.pixels.length, x, y, vy: 0, kind, slot: false, age: 1, life: kind === 'golden' || kind === 'rainbow' ? 99 : Infinity, dead: false }
   g.pixels.push(p)
   return p
 }
@@ -284,73 +285,33 @@ describe('combat mechanics', () => {
     expect(gold.dead).toBe(false)
   })
 
-  it('the fox wanders but does not hunt until FOX FRIEND is bought', () => {
-    const g = makeGame((s) => (s.level = 3))
-    g.pixels = []
-    g.respawns = []
-    addPixel(g, g.fox.x + 10, g.fox.groundY - 10)
-    const xs: number[] = []
-    for (let i = 0; i < 30; i++) {
-      run(g, 1)
-      xs.push(g.fox.x)
-      expect(g.fox.phase === 'sit' || g.fox.phase === 'walk').toBe(true)
-    }
-    expect(g.state.stats.foxKills).toBe(0)
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(10)
-  })
-
-  it('the fox stays on the ground and inside its walkable span', () => {
-    const g = makeGame((s) => (s.level = 3))
-    g.setFoxGround(140, 30, 90)
-    for (let i = 0; i < 600; i++) {
-      run(g, 0.1)
-      expect(g.fox.x).toBeGreaterThanOrEqual(30)
-      expect(g.fox.x).toBeLessThanOrEqual(90)
-      expect(g.fox.y).toBeCloseTo(140)
-    }
-  })
-
-  it('FOX FRIEND appears in the shop at level 3', () => {
-    const g = makeGame((s) => {
-      s.level = 2
-      s.pixels = 1e6
-    })
-    expect(isUnlocked(g.state, 'fox')).toBe(false)
+  it('BLUE PIXELS appear in the shop at level 3 and the first purchase spawns one', () => {
+    const g = makeGame((s) => (s.level = 2))
+    expect(isUnlocked(g.state, 'blue')).toBe(false)
     g.state.level = 3
-    expect(isUnlocked(g.state, 'fox')).toBe(true)
-    expect(g.buy('fox')).toBe(true)
+    expect(isUnlocked(g.state, 'blue')).toBe(true)
+    g.state.pixels = 1e6
+    expect(g.buy('blue')).toBe(true)
+    const p = g.pixels[0]
+    g.pointerDown(p.x, p.y)
+    const events = run(g, F.respawnTime(0) + 0.1)
+    expect(events.some((e) => e.type === 'spawn' && e.kind === 'blue')).toBe(true)
   })
 
-  it('the fox leaps to a nearby pixel, catches it and lands back on the ground', () => {
+  it('blue pixels pay a big helping of XP', () => {
     const g = makeGame((s) => {
       s.level = 3
-      s.upgrades.fox = 1
+      s.upgrades.blue = 1
     })
     g.pixels = []
     g.respawns = []
-    const target = addPixel(g, g.fox.x - 20, g.fox.groundY - 15)
-    const far = addPixel(g, 5, 5)
-    const events = run(g, 1.2 + C.FOX_LEG_MAX)
-    expect(target.dead).toBe(true)
-    expect(far.dead).toBe(false)
-    expect(g.state.stats.foxKills).toBe(1)
-    expect(events.some((e) => e.type === 'pop' && e.cause === 'fox')).toBe(true)
-    run(g, C.FOX_LEG_MAX + 0.1)
-    expect(g.fox.phase === 'sit' || g.fox.phase === 'walk').toBe(true)
-    expect(g.fox.y).toBeCloseTo(g.fox.groundY)
-  })
-
-  it('the fox can catch golden pixels, unlike drones', () => {
-    const g = makeGame((s) => {
-      s.level = 7
-      s.upgrades.fox = 1
-    })
-    g.pixels = []
-    g.respawns = []
-    const gold = addPixel(g, g.fox.x + 15, g.fox.groundY - 10, 'golden')
-    run(g, 1.2 + C.FOX_LEG_MAX)
-    expect(gold.dead).toBe(true)
-    expect(g.state.stats.goldenKills).toBe(1)
+    const xpBefore = g.state.xp
+    const b = addPixel(g, 60, 60, 'blue')
+    g.pointerDown(b.x, b.y)
+    const pop = g.drainEvents().find((e) => e.type === 'pop')
+    expect(pop && pop.type === 'pop' && pop.xp).toBeCloseTo(g.stats.xpPerKill * C.BLUE_XP_MULT)
+    expect(g.state.xp - xpBefore).toBeCloseTo(g.stats.xpPerKill * C.BLUE_XP_MULT)
+    expect(g.state.stats.blueKills).toBe(1)
   })
 
   it('golden pixels expire if nobody catches them', () => {
@@ -359,7 +320,62 @@ describe('combat mechanics', () => {
     gold.life = 0.5
     const events = run(g, 1)
     expect(gold.dead).toBe(true)
-    expect(events.some((e) => e.type === 'golden-expire')).toBe(true)
+    expect(events.some((e) => e.type === 'expire' && e.kind === 'golden')).toBe(true)
+  })
+
+  it('rainbow pixels only appear once RAINBOW MODE is bought', () => {
+    const g = makeGame((s) => (s.level = 17))
+    const quiet = run(g, 60)
+    expect(quiet.some((e) => e.type === 'spawn' && e.kind === 'rainbow')).toBe(false)
+    g.state.pixels = 1e12
+    g.buy('rainbow')
+    const events = run(g, 2)
+    expect(events.some((e) => e.type === 'spawn' && e.kind === 'rainbow')).toBe(true)
+    expect(g.pixels.filter((p) => p.kind === 'rainbow')).toHaveLength(1)
+  })
+
+  it('popping a rainbow pixel makes every pixel pay x5 until rainbow mode ends', () => {
+    const g = makeGame((s) => {
+      s.level = 17
+      s.upgrades.rainbow = 1
+    })
+    g.pixels = []
+    g.respawns = []
+    g.rainbowTimer = Infinity
+    const value = g.stats.value
+    const rb = addPixel(g, 60, 60, 'rainbow')
+    g.pointerDown(rb.x, rb.y)
+    const start = g.drainEvents()
+    expect(start.some((e) => e.type === 'rainbow-start')).toBe(true)
+    expect(g.rainbow).toBeCloseTo(F.rainbowDuration(1))
+    expect(g.state.pixels).toBeCloseTo(value * C.RAINBOW_MULT)
+
+    const p = addPixel(g, 180, 100)
+    g.pointerDown(p.x, p.y)
+    expect(g.state.pixels).toBeCloseTo(value * C.RAINBOW_MULT * 2)
+
+    const events = run(g, F.rainbowDuration(1) + 0.1)
+    expect(events.some((e) => e.type === 'rainbow-end')).toBe(true)
+    expect(g.rainbow).toBe(0)
+    const before = g.state.pixels
+    const q = addPixel(g, 120, 40)
+    g.pointerDown(q.x, q.y)
+    expect(g.state.pixels - before).toBeCloseTo(g.stats.value) // achievements may have raised the base
+  })
+
+  it('drones leave rainbow pixels for the player, and they expire', () => {
+    const g = makeGame((s) => {
+      s.level = 17
+      s.upgrades.auto = 1
+    })
+    g.pixels = []
+    g.respawns = []
+    const rb = addPixel(g, 200, 120, 'rainbow')
+    rb.life = 3
+    const events = run(g, 4)
+    expect(g.state.stats.droneKills).toBeGreaterThan(0)
+    expect(g.rainbow).toBe(0)
+    expect(events.some((e) => e.type === 'expire' && e.kind === 'rainbow')).toBe(true)
   })
 
   it('bombs drop, detonate and clear the blast radius', () => {

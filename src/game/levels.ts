@@ -14,7 +14,7 @@ export interface LevelDef {
  */
 export const LEVELS: LevelDef[] = [
   { level: 2, feature: 'second', title: 'EXTRA PIXELS', desc: 'The upgrade shop opens. Buy EXTRA PIXEL to add more pixels to the arena.' },
-  { level: 3, feature: 'crit', title: 'CRITICAL HITS', desc: 'Buy CRIT CHANCE to start landing x3 critical hits. Oh, and a fox has moved in.' },
+  { level: 3, feature: 'crit', title: 'CRITICAL HITS', desc: 'Buy CRIT CHANCE to start landing x3 critical hits. BLUE PIXELS are in stock too.' },
   { level: 4, feature: 'combo', title: 'COMBOS', desc: 'Buy COMBOS so quick pops stack a multiplier. XP GAIN is in stock too.' },
   { level: 5, feature: 'blast', title: 'BLAST RADIUS', desc: 'Buy BLAST RADIUS to make your taps explode.' },
   { level: 6, feature: 'drone', title: 'AUTO DESTROYER', desc: 'Buy a drone and it hunts pixels for you.' },
@@ -28,6 +28,7 @@ export const LEVELS: LevelDef[] = [
   { level: 14, feature: 'cluster', title: 'CLUSTER BOMBS', desc: 'Buy CLUSTER BOMBS so bombs scatter bomblets.' },
   { level: 15, feature: 'twin', title: 'TWIN LASERS', desc: 'Buy TWIN LASERS to fire two beams per strike.' },
   { level: 16, feature: 'goldRain', title: 'GOLDEN STORMS', desc: 'Buy GOLDEN STORMS so rain carries golden pixels.' },
+  { level: 17, feature: 'rainbow', title: 'RAINBOW MODE', desc: 'Buy RAINBOW MODE for rare rainbow pixels. Pop one and every pixel pays x5 for a few seconds.' },
   { level: 18, feature: 'overclock', title: 'OVERCLOCK', desc: 'Buy OVERCLOCK to run every machine 25% faster.' },
   { level: 20, feature: 'signal', title: 'SIGNAL', desc: 'Something is stirring beneath the grid. To be continued.' },
 ]

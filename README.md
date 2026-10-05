@@ -12,7 +12,7 @@ A retro dot-matrix incremental game about destroying a single pixel, and then a 
 ![Vite](https://img.shields.io/badge/Vite-8-7a7a7a?style=flat-square&labelColor=171717)
 ![Tailwind](https://img.shields.io/badge/Tailwind-4-7a7a7a?style=flat-square&labelColor=171717)
 
-<img src="docs/screenshots/mid-game.png" alt="Mid-game: drones, a bomb blast, a laser beam, crits and the fox in a dot-matrix arena" width="900">
+<img src="docs/screenshots/mid-game.png" alt="Mid-game: drones, a bomb blast, a laser beam and crits in a dot-matrix arena" width="900">
 
 </div>
 
@@ -51,7 +51,7 @@ Click it and it explodes. You get a pixel. A faint bracket marks where it will c
         +-------------------------- upgrade, automate, repeat ----------------+
 ```
 
-From there the arena slowly fills with more pixels, drones, a fox, bombs, lasers, storms of falling pixels and, eventually, a nuke.
+From there the arena slowly fills with more pixels, drones, bombs, lasers, storms of falling pixels and, eventually, a nuke.
 
 ## How to play
 
@@ -59,7 +59,7 @@ From there the arena slowly fills with more pixels, drones, a fox, bombs, lasers
 2. **Wait for it to come back.** Respawning is the first thing you will want to speed up.
 3. **Level up.** XP fills the bar in the balance box. Each level adds +5% pixel value and stocks the shop with something new.
 4. **Buy upgrades.** The shop opens at level 2. Every new mechanic arrives at level 0 and does nothing until you buy level 1, so you choose what to switch on and when.
-5. **Automate.** Drones, the fox, bombs and lasers keep destroying pixels while you watch, or while you are away.
+5. **Automate.** Drones, bombs and lasers keep destroying pixels while you watch, or while you are away.
 
 Controls: click or tap pixels. Tap a bomb to detonate it early. Tap an upgrade to buy one level, hold it to keep buying, or hit **MAX** to buy every level you can afford.
 
@@ -73,9 +73,10 @@ Controls: click or tap pixels. Tap a bomb to detonate it early. Tap an upgrade t
 
 **Mechanics**
 - Critical hits, combos, explosive taps and chain reactions
+- Blue pixels: worth x10 XP, for when you want the next level sooner
 - Golden pixels: rare, fleeting, worth x25, and the drones cannot catch them
+- Rainbow mode: pop a rainbow pixel and every pixel pays x5 for a few seconds, while the arena and balance box light up like an RGB keyboard
 - Auto-destroyer drones that fly to pixels and click them
-- A fox that wanders the ground and leaps to catch pixels, golden ones included
 - Bombs that drop into crowds, orbital lasers, pixel rain storms and a nuke that wipes the board
 
 **World**
@@ -86,7 +87,7 @@ Controls: click or tap pixels. Tap a bomb to detonate it early. Tap an upgrade t
 **Platform**
 - Feels right on phones as well as desktops, with a bottom-sheet shop on mobile
 - Local-first saves with autosave, export/import codes, reset, and capped offline progress
-- Static site, deployable to Cloudflare
+- Static site, hosted on Vercel
 
 ## Screenshots
 
@@ -100,11 +101,7 @@ Controls: click or tap pixels. Tap a bomb to detonate it early. Tap an upgrade t
     <td width="50%"><img src="docs/screenshots/nuke.png" alt="The nuke detonating"><br><sub><b>Nuked.</b> Every pixel on screen pays out the warhead yield.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/fox-leap.png" alt="The fox catching a pixel, with a pink heart"><br><sub><b>The fox.</b> It wanders the ground and leaps for pixels once you buy FOX FRIEND.</sub></td>
-    <td width="50%" rowspan="2" align="center"><img src="docs/screenshots/mobile.png" alt="The game on a phone" width="300"><br><sub><b>Mobile.</b> Arena on top, shop in a collapsible bottom sheet.</sub></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center"><img src="docs/screenshots/levels-tab.png" alt="The levels tab with locked unlocks" width="260"><br><sub><b>Levels tab.</b> The next two unlocks are named; the rest stay <code>???</code>.</sub></td>
+    <td colspan="2" align="center"><img src="docs/screenshots/mobile.png" alt="The game on a phone" width="300"><br><sub><b>Mobile.</b> Arena on top, shop in a collapsible bottom sheet.</sub></td>
   </tr>
 </table>
 
@@ -118,7 +115,7 @@ Levels unlock **mechanics**, not stat bumps. Reaching a level stocks the shop; y
 | Level | Unlock | What it adds |
 | --- | --- | --- |
 | 2 | Extra pixels | The shop opens. Buy more pixels for the arena. |
-| 3 | Critical hits, the fox | Crit chance and crit power. A fox moves in. |
+| 3 | Critical hits, blue pixels | Crit chance and crit power. Blue pixels worth x10 XP. |
 | 4 | Combos | Quick pops stack a multiplier. XP Gain appears too. |
 | 5 | Blast radius | Your taps explode and catch nearby pixels. |
 | 6 | Auto destroyer | Buy drones that hunt pixels for you. |
@@ -132,6 +129,7 @@ Levels unlock **mechanics**, not stat bumps. Reaching a level stocks the shop; y
 | 14 | Cluster bombs | Bombs scatter bomblets. |
 | 15 | Twin lasers | Two beams per strike. |
 | 16 | Golden storms | Pixel rain carries golden pixels. |
+| 17 | Rainbow mode | Rare rainbow pixels; pop one and every pixel pays x5 for a few seconds. |
 | 18 | Overclock | Every machine runs 25% faster. |
 | 20 | ??? | To be continued. |
 
@@ -145,7 +143,7 @@ Levels unlock **mechanics**, not stat bumps. Reaching a level stocks the shop; y
 | Pixel Value | 2 | Every pixel is worth more |
 | Extra Pixel | 2 | One more pixel in the arena per level |
 | Crit Chance / Crit Power | 3 | Unlock critical hits, then make them bigger |
-| Fox Friend | 3 | The fox leaps for pixels; levels make it faster and longer-ranged |
+| Blue Pixels | 3 | Blue spawn chance (x10 XP each) |
 | Combos / XP Gain | 4 | Combo multiplier and cap; more XP per pixel |
 | Blast Radius | 5 | Explosive taps |
 | Auto Destroyer | 6 | Drones; every third level adds another |
@@ -156,6 +154,7 @@ Levels unlock **mechanics**, not stat bumps. Reaching a level stocks the shop; y
 | Lasers | 11 | Laser frequency |
 | Nuke Silo / Warhead Yield | 12 | Build and charge the nuke; nuked pixels pay more |
 | Drone Swarm, Cluster Bombs, Twin Lasers, Golden Storms, Overclock | 13 to 18 | One-off perks |
+| Rainbow Mode | 17 | Rainbow pixels arrive more often and rainbow mode lasts longer (2s up to 4s) |
 
 Costs grow exponentially per level, so every upgrade stays a choice rather than a checklist.
 
@@ -173,7 +172,7 @@ The game is tuned for roughly the first 20 to 30 minutes of play. Pacing is chec
 - **Local-first.** Progress lives in `localStorage` and autosaves every 15 seconds, on level-ups, and when the tab is hidden or closed.
 - **Versioned format** with a migration chain and strict sanitising, so old or hand-edited saves load safely.
 - **Export / import** from the SYSTEM tab as a single `ONEPIXEL:` code with a checksum that rejects corrupted or tampered codes.
-- **Offline progress** counts only automation (drones, fox, bombs, lasers), runs at 50% efficiency, and is capped at 4 hours.
+- **Offline progress** counts only automation (drones, bombs, lasers), runs at 50% efficiency, and is capped at 4 hours.
 - **Clock abuse protection.** Offline time is measured from the latest timestamp the game has ever seen, so winding the clock back pays nothing and winding it forward again only pays out once real time catches up. While the tab is merely hidden, the game uses the browser's monotonic clock instead of the wall clock.
 
 ## Running locally
@@ -231,7 +230,7 @@ flowchart LR
   Save <--> Game
 ```
 
-- **Game** owns all state: pixels, drones, the fox, bombs, lasers and the save data. It emits one-shot events (`pop`, `blast`, `levelup`, ...) that the renderer and audio turn into effects.
+- **Game** owns all state: pixels, drones, bombs, lasers and the save data. It emits one-shot events (`pop`, `blast`, `levelup`, ...) that the renderer and audio turn into effects.
 - **Renderer** draws a pre-rendered dot-matrix backdrop, then live entities, pooled particles, shockwaves and floating text. Everything snaps to a chunky pixel grid. It never mutates game state.
 - **Sfx** maps events to named cues synthesised with WebAudio. Swapping in sampled sounds later only changes the cue playback, not the mapping.
 - **React** renders the HUD and shop and re-renders on a throttled version counter, not every frame.
@@ -255,10 +254,10 @@ docs/screenshots/   README images
 npm test
 ```
 
-76 tests cover:
+77 tests cover:
 
 - **Formulas:** cost curves, stat curves, caps, and that every mechanic is off at level 0
-- **Engine:** the opening (exactly one pixel), respawning, purchases and MAX buying, level-ups, crits, combos, blasts, drones, the fox, golden pixels, bombs, lasers, chains, the nuke, rain and determinism
+- **Engine:** the opening (exactly one pixel), respawning, purchases and MAX buying, level-ups, crits, combos, blasts, drones, blue and golden pixels, rainbow mode, bombs, lasers, chains, the nuke, rain and determinism
 - **Saves:** export/import round trips, checksum tampering, version migration, sanitising hostile values, and offline clock-rollback protection
 - **Pacing:** two simulated players (engaged and casual) are run through 30 minutes of play, with milestones asserted to land in sensible windows
 
@@ -268,17 +267,17 @@ The simulated player (`src/game/bot.ts`) taps the oldest pixel it can see, buys 
 
 OnePixel is a static site.
 
-- **Cloudflare Pages:** build command `npm run build`, output directory `dist`.
-- **Cloudflare Workers static assets:** `npm run build && npx wrangler deploy` (configured in `wrangler.jsonc`).
+Hosted on Vercel, configured in `vercel.json` (Vite build, output `dist`).
 
-`public/_headers` sets long-lived caching for hashed assets and no caching for `index.html`.
+- **Deploy:** `vercel --prod`, or push to `main` once the GitHub repo is connected in the Vercel dashboard.
+- **Caching:** hashed files under `/assets` are cached for a year as immutable; `index.html` uses Vercel's default revalidation, so a new deploy shows up immediately.
 
 ## Roadmap
 
 - More of the late game beyond level 20 (something is stirring beneath the grid)
 - Prestige / reset layer
 - Sampled sound pack and music
-- More creatures sharing the arena with the fox
+- Creatures to share the arena
 
 Ideas and bug reports are welcome in [issues](https://github.com/byalex33/OnePixel/issues).
 

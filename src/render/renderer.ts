@@ -3,9 +3,9 @@ import { fmt } from '../game/format'
 import type { Game } from '../game/game'
 import type { GameEvent } from '../game/types'
 import { buildField, paintField, sceneryStage, type DotField } from './dotfield'
-import { C_CYAN, C_DARK, C_GOLD, C_LIGHT, C_MID, C_ORANGE, C_RED, C_WHITE, PAL } from './palette'
+import { C_BLUE, C_CYAN, C_DARK, C_GOLD, C_LIGHT, C_MID, C_ORANGE, C_RAINBOW, C_RED, C_WHITE, PAL, rainbowHue } from './palette'
 import { Particles } from './particles'
-import { BOMB, CURSOR, drawSprite, FOX_EYE, FOX_TAIL_DOWN, FOX_TAIL_UP, FOX_WALK_A, FOX_WALK_B, FOX_WALK_EYE, HEART, type Sprite } from './sprites'
+import { BOMB, CURSOR, drawSprite } from './sprites'
 
 interface Ring {
   x: number
@@ -38,7 +38,6 @@ interface Zap {
 
 const FONT = '"Press Start 2P", ui-monospace, monospace'
 const MAX_TEXTS = 40
-const FOX_HOP = 0.4
 
 const easeOutBack = (t: number) => {
   const c1 = 1.9
@@ -75,10 +74,6 @@ export class Renderer {
   private freeze = 0
   private time = 0
   private lowFx: boolean
-  /** Seconds left in the fox's current hop. */
-  private foxHop = 0
-  /** Little hearts that float up when the fox catches a pixel. */
-  private hearts: { x: number; y: number; t: number }[] = []
   private canvas: HTMLCanvasElement
 
   constructor(canvas: HTMLCanvasElement, game: Game, lowFx: boolean) {
@@ -104,7 +99,7 @@ export class Renderer {
   /** Size the canvas and derive the world dimensions (constant area). */
   resize(cssW: number, cssH: number, dpr: number, force = false): void {
     // A hidden or collapsed container reports ~0px; laying the world out at that
-    // size would scramble positions (e.g. the fox's walkable span). Keep the last size.
+    // size would scramble positions. Keep the last size.
     if (cssW < 8 || cssH < 8) return
     if (!force && cssW === this.cssW && cssH === this.cssH && Math.min(dpr || 1, 2) === this.dpr) return
     this.cssW = Math.max(1, cssW)
@@ -146,12 +141,6 @@ export class Renderer {
     this.stage = stage
     this.field = buildField(this.cssW, this.cssH, this.game.state.level)
     paintField(this.bg, this.field, this.cssW, this.cssH, this.dpr)
-    // Tell the simulation where the ground is so the fox walks along the scenery.
-    const f = this.field
-    if (f.ground !== null) {
-      const groundY = f.oy + (f.ground - 1) * f.spacing
-      this.game.setFoxGround(groundY / this.scale, (f.ox + 7 * f.spacing) / this.scale, (f.ox + (f.cols - 8) * f.spacing) / this.scale)
-    }
   }
 
   // ------------------------------------------------------------------ events
@@ -169,8 +158,6 @@ export class Renderer {
       switch (e.type) {
         case 'pop':
           this.pop(e, many)
-          if (e.cause === 'click' && this.foxHop <= 0 && this.nearFox(e.x * this.scale, e.y * this.scale)) this.foxHop = FOX_HOP
-          if (e.cause === 'fox' && this.hearts.length < 8) this.hearts.push({ x: e.x * this.scale + this.ps * 1.8, y: e.y * this.scale - this.ps, t: 0 })
           if (many && !e.crit) {
             sum += e.amount
             sx += e.x
@@ -198,11 +185,15 @@ export class Renderer {
           if (!this.lowFx || this.game.pixels.length < 6) {
             const x = e.x * this.scale
             const y = e.y * this.scale
-            this.particles.burst(x, y, 4, 40 * this.k, 0.35, 2, e.kind === 'golden' ? [C_GOLD] : [C_LIGHT, C_MID])
+            this.particles.burst(x, y, 4, 40 * this.k, 0.35, 2, e.kind === 'golden' ? [C_GOLD] : e.kind === 'blue' ? [C_BLUE, C_CYAN] : e.kind === 'rainbow' ? C_RAINBOW : [C_LIGHT, C_MID])
           }
           if (e.kind === 'golden') this.ring(e.x * this.scale, e.y * this.scale, this.ps * 2.5, 0.4, PAL.gold, true, true)
+          if (e.kind === 'rainbow') this.ring(e.x * this.scale, e.y * this.scale, this.ps * 3, 0.5, PAL.white, true, true)
           break
-        case 'golden-expire':
+        case 'rainbow-start':
+          this.rainbowFx()
+          break
+        case 'expire':
           this.particles.burst(e.x * this.scale, e.y * this.scale, 10, 40 * this.k, 0.5, 2, [C_MID, C_DARK])
           break
         case 'bomb-drop':
@@ -213,7 +204,6 @@ export class Renderer {
           break
         case 'levelup':
           this.levelFx()
-          this.foxHop = FOX_HOP
           break
       }
     }
@@ -232,8 +222,16 @@ export class Renderer {
     if (many) count = Math.max(3, Math.round(count / 2))
     if (!manual) count = Math.round(count * 0.6)
 
-    const colors =
-      e.kind === 'golden' ? [C_GOLD, C_GOLD, C_WHITE, C_ORANGE] : e.kind === 'rain' ? [C_WHITE, C_LIGHT, C_CYAN] : [C_WHITE, C_WHITE, C_LIGHT, C_MID]
+    const rainbow = e.kind === 'rainbow' || this.game.rainbow > 0
+    const colors = rainbow
+      ? [...C_RAINBOW]
+      : e.kind === 'golden'
+        ? [C_GOLD, C_GOLD, C_WHITE, C_ORANGE]
+        : e.kind === 'blue'
+          ? [C_BLUE, C_BLUE, C_CYAN, C_WHITE]
+          : e.kind === 'rain'
+          ? [C_WHITE, C_LIGHT, C_CYAN]
+          : [C_WHITE, C_WHITE, C_LIGHT, C_MID]
     // Combos and crits progressively paint the explosion.
     if (e.combo >= 10) colors.push(C_CYAN)
     if (e.combo >= 20) colors.push(C_GOLD, C_RED)
@@ -256,9 +254,17 @@ export class Renderer {
       this.addTrauma(0.18)
       this.particles.burst(x, y, this.lowFx ? 14 : 28, 240 * k, 0.9, size, [C_GOLD, C_WHITE], 200 * k)
       this.text(x, y - ps * 0.4, `+${fmt(e.amount)}`, PAL.gold, 14, 1.2)
+    } else if (e.kind === 'blue') {
+      this.particles.burst(x, y, this.lowFx ? 10 : 20, 200 * k, 0.8, size, [C_BLUE, C_CYAN], 160 * k)
+      this.text(x, y - ps * 1.4, `+${fmt(e.xp)} XP`, PAL.blue, 12, 1.1)
+      this.text(x, y - ps * 0.4, `+${fmt(e.amount)}`, rainbow ? this.hue(x, y) : PAL.white, 10, 0.85)
+    } else if (e.kind === 'rainbow') {
+      this.particles.burst(x, y, this.lowFx ? 18 : 36, 280 * k, 1, size, C_RAINBOW, 160 * k)
+      this.text(x, y - ps * 0.4, `+${fmt(e.amount)}`, this.hue(x, y), 14, 1.2)
     } else if (!many) {
       if (manual) this.addTrauma(0.1)
-      this.text(x, y - ps * 0.4, `+${fmt(e.amount)}`, manual ? PAL.white : PAL.light, manual ? 10 : 8, manual ? 0.85 : 0.7)
+      const color = rainbow ? this.hue(x, y) : manual ? PAL.white : PAL.light
+      this.text(x, y - ps * 0.4, `+${fmt(e.amount)}`, color, manual ? 10 : 8, manual ? 0.85 : 0.7)
     }
   }
 
@@ -313,6 +319,20 @@ export class Renderer {
     this.text(cx, cy + 16, `+${fmt(amount)}`, PAL.gold, 16, 2.2)
   }
 
+  private rainbowFx(): void {
+    const cx = this.cssW / 2
+    const cy = this.cssH / 2
+    this.addTrauma(0.3)
+    this.setFlash(PAL.white, 0.18, 0.3)
+    this.ring(cx, cy, Math.hypot(this.cssW, this.cssH) * 0.6, 0.8, PAL.white, true, true)
+    this.text(cx, cy - 10, 'RAINBOW MODE', this.hue(cx, cy), 18, 1.6)
+    this.text(cx, cy + 16, `x${C.RAINBOW_MULT} EVERYTHING`, PAL.white, 10, 1.6)
+  }
+
+  private hue(x: number, y: number): string {
+    return `hsl(${rainbowHue(this.time, x, y)} 100% 62%)`
+  }
+
   private levelFx(): void {
     const cx = this.cssW / 2
     const cy = this.cssH / 2
@@ -363,9 +383,6 @@ export class Renderer {
     for (const z of this.zaps) z.t += dt
     this.zaps = this.zaps.filter((z) => z.t < 0.12)
     this.flash.t += dt
-    if (this.foxHop > 0) this.foxHop = Math.max(0, this.foxHop - dt)
-    for (const h of this.hearts) h.t += dt
-    this.hearts = this.hearts.filter((h) => h.t < 0.9)
     if (this.reveal < 1) this.reveal = Math.min(1, this.reveal + dt / 1.6)
     if (g.nuke) this.trauma = Math.max(this.trauma, 0.25)
     this.trauma = Math.max(0, this.trauma - dt * 1.7)
@@ -386,7 +403,6 @@ export class Renderer {
     ctx.fillRect(0, 0, this.cssW, this.cssH)
     ctx.translate(ox, oy)
     this.drawBackground()
-    this.drawFox()
     this.drawGridRipples()
     this.drawRespawns()
     this.drawBombs()
@@ -397,10 +413,10 @@ export class Renderer {
     this.particles.draw(ctx)
     this.drawRings()
     this.drawTexts()
-    this.drawHearts()
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     this.drawNukeWarning()
     this.drawFrenzy()
+    this.drawRainbow()
     this.drawFlash()
   }
 
@@ -420,94 +436,6 @@ export class Renderer {
     ctx.fillStyle = PAL.light
     ctx.globalAlpha = 0.6
     ctx.fillRect(0, Math.round(edge), w, 2)
-    ctx.globalAlpha = 1
-  }
-
-  /** Is a CSS-space point close enough to the fox to startle it? */
-  private nearFox(x: number, y: number): boolean {
-    const f = this.field
-    if (!f || f.ground === null) return false
-    const fox = this.game.fox
-    return Math.hypot(x - fox.x * this.scale, y - (fox.y * this.scale - f.spacing * 4)) < f.spacing * 12
-  }
-
-  /**
-   * The fox: strolls along the ground with a two-frame walk, sits and wags its
-   * tail between strolls, hops when startled or on level-up, and leaps after
-   * pixels when FOX FRIEND sends it hunting. Position comes from the simulation.
-   */
-  private drawFox(): void {
-    const f = this.field
-    if (!f || f.ground === null) return
-    const ctx = this.ctx
-    const t = this.time
-    const sp = f.spacing
-    const sim = this.game.fox
-    const leaping = sim.phase === 'out' || sim.phase === 'back'
-    const walking = sim.phase === 'walk'
-    let sprite: Sprite
-    let eye: { r: number; c: number }
-    if (leaping) {
-      sprite = FOX_WALK_A
-      eye = FOX_WALK_EYE
-    } else if (walking) {
-      // Step the legs in time with the distance walked, so feet don't skate.
-      sprite = Math.floor(sim.x * this.scale / (sp * 1.5)) % 2 === 0 ? FOX_WALK_A : FOX_WALK_B
-      eye = FOX_WALK_EYE
-    } else {
-      sprite = Math.floor(t * 2.2) % 2 === 0 ? FOX_TAIL_UP : FOX_TAIL_DOWN
-      eye = FOX_EYE
-    }
-    const blink = !leaping && t % 3.7 < 0.14
-    const hopP = !leaping && this.foxHop > 0 ? 1 - this.foxHop / FOX_HOP : 0
-    const lift = Math.sin(hopP * Math.PI) * sp * 1.6
-    const bob = walking ? (Math.floor(sim.x * this.scale / (sp * 1.5)) % 2) * 1 : 0
-    const edge = this.reveal < 1 ? this.cssH * (1 - this.reveal) : -Infinity
-    const w = sprite[0].length
-    const h = sprite.length
-    // On the ground the fox snaps to dot columns so it moves in crisp
-    // dot-matrix steps; mid-leap it flies freely.
-    const rawX = sim.x * this.scale
-    const ax = leaping ? rawX : f.ox + Math.round((rawX - f.ox) / sp) * sp + (w % 2 === 0 ? sp / 2 : 0)
-    const ay = sim.y * this.scale - lift - bob
-
-    for (const [key, color, rad, alpha] of [
-      ['o', PAL.orange, 1.9, 0.9],
-      ['w', PAL.white, 1.7, 0.85],
-    ] as const) {
-      ctx.fillStyle = color
-      ctx.globalAlpha = alpha
-      ctx.beginPath()
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const ch = blink && y === eye.r && x === eye.c ? 'o' : sprite[y][x]
-          if (ch !== key) continue
-          const gx = sim.facing === 1 ? x : w - 1 - x
-          const px = ax + (gx - (w - 1) / 2) * sp
-          const py = ay - (h - 1 - y) * sp
-          if (py < edge) continue
-          ctx.moveTo(px + rad, py)
-          ctx.arc(px, py, rad, 0, Math.PI * 2)
-        }
-      }
-      ctx.fill()
-    }
-    ctx.globalAlpha = 1
-  }
-
-  /** Drawn after floating numbers so the catch reward never hides them. */
-  private drawHearts(): void {
-    const f = this.field
-    if (!f || this.hearts.length === 0) return
-    const ctx = this.ctx
-    const bit = Math.max(3, Math.round(f.spacing * 0.45))
-    for (const heart of this.hearts) {
-      const p = heart.t / 0.9
-      const pop = p < 0.15 ? 0.5 + p / 0.3 : 1
-      const b = Math.max(2, Math.round(bit * pop))
-      ctx.globalAlpha = p > 0.7 ? 0.5 : 1
-      drawSprite(ctx, HEART, heart.x - b * 2.5, heart.y - b * 2.5 - p * 30, b, { '1': PAL.pink })
-    }
     ctx.globalAlpha = 1
   }
 
@@ -585,9 +513,12 @@ export class Renderer {
       const breathe = 1 + 0.05 * Math.sin(this.time * 4 + p.id)
       const s = Math.max(2, Math.round(base * pop * breathe))
       const golden = p.kind === 'golden'
-      if (golden && p.life < 1.6 && Math.floor(this.time * 12) % 2 === 0) continue
+      const special = golden || p.kind === 'rainbow'
+      if (special && p.life < 1.6 && Math.floor(this.time * 12) % 2 === 0) continue
 
-      const color = golden ? PAL.gold : p.kind === 'rain' ? PAL.light : PAL.white
+      const blue = p.kind === 'blue'
+      const rainbow = p.kind === 'rainbow' || this.game.rainbow > 0
+      const color = rainbow ? this.hue(x, y) : golden ? PAL.gold : blue ? PAL.blue : p.kind === 'rain' ? PAL.light : PAL.white
       if (p.kind === 'rain' || p.vy > 0) {
         ctx.fillStyle = color
         for (let i = 1; i <= 3; i++) {
@@ -596,8 +527,8 @@ export class Renderer {
           ctx.fillRect(Math.round(x - ts / 2), Math.round(y - s / 2 - i * s * 0.9), ts, ts)
         }
       }
-      const glow = Math.round(s * (golden ? 2.8 : 2.1))
-      ctx.globalAlpha = golden ? 0.16 : 0.045 + 0.025 * Math.sin(this.time * 3 + p.id)
+      const glow = Math.round(s * (special ? 2.8 : rainbow || blue ? 2.4 : 2.1))
+      ctx.globalAlpha = special ? 0.16 : rainbow || blue ? 0.12 + 0.04 * Math.sin(this.time * 4 + p.id) : 0.045 + 0.025 * Math.sin(this.time * 3 + p.id)
       ctx.fillStyle = color
       ctx.fillRect(Math.round(x - glow / 2), Math.round(y - glow / 2), glow, glow)
       ctx.globalAlpha = 1
@@ -605,6 +536,10 @@ export class Renderer {
 
       if (golden && Math.random() < dt * 8) {
         this.particles.add(x + (Math.random() - 0.5) * s * 2, y + (Math.random() - 0.5) * s * 2, 0, -20, 0.5, 2, C_GOLD)
+      }
+      if (p.kind === 'rainbow' && Math.random() < dt * 14) {
+        const c = C_RAINBOW[(Math.random() * C_RAINBOW.length) | 0]
+        this.particles.add(x + (Math.random() - 0.5) * s * 2.4, y + (Math.random() - 0.5) * s * 2.4, 0, -24, 0.6, 2, c)
       }
       if (first) {
         // The only "tutorial": a pulsing target bracket around the very first pixel.
@@ -792,6 +727,31 @@ export class Renderer {
     ctx.fillRect(0, this.cssH - e, this.cssW, e)
     ctx.fillRect(0, 0, e, this.cssH)
     ctx.fillRect(this.cssW - e, 0, e, this.cssH)
+    ctx.globalAlpha = 1
+  }
+
+  /** Rainbow mode: an RGB-keyboard wave running round the edge of the arena. */
+  private drawRainbow(): void {
+    const r = this.game.rainbow
+    if (r <= 0) return
+    const ctx = this.ctx
+    const w = this.cssW
+    const h = this.cssH
+    const e = 6
+    const seg = 12
+    ctx.globalAlpha = Math.min(1, r * 2) * 0.55
+    for (let x = 0; x < w; x += seg) {
+      ctx.fillStyle = this.hue(x, 0)
+      ctx.fillRect(x, 0, seg, e)
+      ctx.fillStyle = this.hue(x, h)
+      ctx.fillRect(x, h - e, seg, e)
+    }
+    for (let y = e; y < h - e; y += seg) {
+      ctx.fillStyle = this.hue(0, y)
+      ctx.fillRect(0, y, e, seg)
+      ctx.fillStyle = this.hue(w, y)
+      ctx.fillRect(w - e, y, e, seg)
+    }
     ctx.globalAlpha = 1
   }
 

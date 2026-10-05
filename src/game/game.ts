@@ -68,32 +68,6 @@ interface PendingBlast {
   depth: number
 }
 
-export interface FoxState {
-  x: number
-  y: number
-  /** Ground line and walkable span; set by the renderer to match the scenery. */
-  groundY: number
-  minX: number
-  maxX: number
-  /** sit / walk: wandering along the ground. out / back: a leap after a pixel. */
-  phase: 'sit' | 'walk' | 'out' | 'back'
-  t: number
-  /** Duration of the current leap leg. */
-  dur: number
-  fromX: number
-  fromY: number
-  toX: number
-  toY: number
-  /** Peak height of the current leap, in world units. */
-  arc: number
-  /** Where the current stroll is heading. */
-  walkTo: number
-  /** Seconds left sitting before the next stroll. */
-  rest: number
-  cooldown: number
-  facing: 1 | -1
-}
-
 export interface Rect {
   x: number
   y: number
@@ -102,6 +76,8 @@ export interface Rect {
 }
 
 const MAX_EVENTS = 800
+/** Golden and rainbow pixels are left for the player. */
+const droneCanTake = (p: Pixel) => p.kind !== 'golden' && p.kind !== 'rainbow'
 const EARN_BINS = 10
 const EARN_BIN_SECONDS = 0.5
 
@@ -113,8 +89,6 @@ export class Game {
   state: SaveState
   stats: Stats
   rng: Rng
-  /** Separate stream for the fox's cosmetic wandering, so it never shifts gameplay rolls. */
-  private foxRng: Rng
 
   w = 240
   h = 160
@@ -129,10 +103,12 @@ export class Game {
   bombs: Bomb[] = []
   lasers: Laser[] = []
   combo = { count: 0, timer: 0 }
-  fox: FoxState
   rain = { active: false, remaining: 0, acc: 0, caught: 0 }
   nuke: { t: number } | null = null
   frenzy = 0
+  /** Seconds of rainbow mode left; every pixel pays x5 while it runs. */
+  rainbow = 0
+  rainbowTimer: number
   bombTimer: number
   laserTimer: number
   time = 0
@@ -144,6 +120,8 @@ export class Game {
   private statsDirty = false
   /** Guarantees the first spawn after unlocking golden pixels is golden. */
   private forceGolden = false
+  /** Same for blue pixels, so the first purchase shows off straight away. */
+  private forceBlue = false
   private achTimer = 0
   private earnBins: number[] = new Array(EARN_BINS).fill(0)
   private earnBinT = 0
@@ -153,31 +131,10 @@ export class Game {
   constructor(state: SaveState = createInitialState(), seed?: number) {
     this.state = state
     this.rng = new Rng(seed)
-    this.foxRng = new Rng(seed === undefined ? undefined : seed ^ 0x5f0c5)
     this.stats = computeStats(state)
     this.bombTimer = Math.min(this.stats.bombInterval, 4)
     this.laserTimer = Math.min(this.stats.laserInterval, 3)
-    const fx = this.w * 0.6
-    const fy = this.h * 0.8
-    this.fox = {
-      x: fx,
-      y: fy,
-      groundY: fy,
-      minX: 12,
-      maxX: this.w - 12,
-      phase: 'sit',
-      t: 0,
-      dur: C.FOX_LEG_MIN,
-      fromX: fx,
-      fromY: fy,
-      toX: fx,
-      toY: fy,
-      arc: 0,
-      walkTo: fx,
-      rest: 1.5,
-      cooldown: 1,
-      facing: -1,
-    }
+    this.rainbowTimer = Math.min(this.stats.rainbowInterval, 10)
     // The very first thing the player sees: one pixel, dead centre.
     this.spawnPixel(this.w / 2, this.h / 2, 'normal', true)
     this.ensureSlots()
@@ -198,9 +155,6 @@ export class Game {
     this.drones.forEach(scaleAll)
     this.bombs.forEach(scaleAll)
     this.blasts.forEach(scaleAll)
-    const fx = this.fox
-    for (const k of ['x', 'minX', 'maxX', 'fromX', 'toX', 'walkTo'] as const) fx[k] *= sx
-    for (const k of ['y', 'groundY', 'fromY', 'toY'] as const) fx[k] *= sy
     for (const l of this.lasers) {
       l.x1 *= sx
       l.x2 *= sx
@@ -209,21 +163,6 @@ export class Game {
     }
     this.w = w
     this.h = h
-  }
-
-  /** Line the fox's ground and walkable span up with the scenery (world units). */
-  setFoxGround(groundY: number, minX: number, maxX: number): void {
-    const f = this.fox
-    f.groundY = groundY
-    f.minX = minX
-    f.maxX = Math.max(minX, maxX)
-    if (f.phase === 'sit' || f.phase === 'walk') {
-      f.y = groundY
-      f.x = Math.max(f.minX, Math.min(f.maxX, f.x))
-      f.walkTo = Math.max(f.minX, Math.min(f.maxX, f.walkTo))
-    } else if (f.phase === 'back') {
-      f.toY = groundY
-    }
   }
 
   drainEvents(): GameEvent[] {
@@ -332,11 +271,11 @@ export class Game {
     this.updatePixels(dt)
     this.updateRespawns(dt)
     this.updateDrones(dt)
-    this.updateFox(dt)
     this.updateBombs(dt)
     this.updateBlasts(dt)
     this.updateLasers(dt)
     this.updateRain(dt)
+    this.updateRainbow(dt)
     if (this.frenzy > 0) this.frenzy = Math.max(0, this.frenzy - dt)
 
     // Compact dead entities once per tick.
@@ -381,7 +320,12 @@ export class Game {
       amount *= C.GOLDEN_MULT
       xp *= C.GOLDEN_XP_MULT
       st.goldenKills++
+    } else if (p.kind === 'blue') {
+      xp *= C.BLUE_XP_MULT
+      st.blueKills++
     }
+    if (p.kind === 'rainbow') this.startRainbow()
+    if (this.rainbow > 0) amount *= C.RAINBOW_MULT
     const crit = s.critChance > 0 && this.rng.chance(s.critChance)
     if (crit) {
       amount *= s.critMult
@@ -397,7 +341,6 @@ export class Game {
     else if (cause === 'bomb') st.bombKills++
     else if (cause === 'laser') st.laserKills++
     else if (cause === 'chain') st.chainKills++
-    else if (cause === 'fox') st.foxKills++
     if (p.kind === 'rain' || (p.vy > 0 && p.kind === 'golden')) {
       st.rainKills++
       if (this.rain.active) this.rain.caught++
@@ -467,6 +410,12 @@ export class Game {
       case 'golden':
         this.forceGolden = true
         break
+      case 'blue':
+        this.forceBlue = true
+        break
+      case 'rainbow':
+        this.rainbowTimer = 1.5
+        break
     }
   }
 
@@ -475,6 +424,7 @@ export class Game {
     this.statsDirty = false
     if (this.bombTimer > this.stats.bombInterval) this.bombTimer = this.stats.bombInterval
     if (this.laserTimer > this.stats.laserInterval) this.laserTimer = this.stats.laserInterval
+    if (this.rainbowTimer > this.stats.rainbowInterval) this.rainbowTimer = this.stats.rainbowInterval
   }
 
   private checkAchievements(): void {
@@ -511,7 +461,7 @@ export class Game {
       kind,
       slot,
       age: 0,
-      life: kind === 'golden' && vy === 0 ? C.GOLDEN_LIFETIME : Infinity,
+      life: vy !== 0 ? Infinity : kind === 'golden' ? C.GOLDEN_LIFETIME : kind === 'rainbow' ? C.RAINBOW_LIFETIME : Infinity,
       dead: false,
     }
     this.pixels.push(p)
@@ -609,7 +559,7 @@ export class Game {
         p.life -= dt
         if (p.life <= 0) {
           p.dead = true
-          this.emit({ type: 'golden-expire', x: p.x, y: p.y })
+          this.emit({ type: 'expire', x: p.x, y: p.y, kind: p.kind })
           if (p.slot) this.queueRespawn()
         }
       }
@@ -631,6 +581,9 @@ export class Game {
       if (this.stats.goldenChance > 0 && (this.forceGolden || this.rng.chance(this.stats.goldenChance))) {
         kind = 'golden'
         this.forceGolden = false
+      } else if (this.stats.blueChance > 0 && (this.forceBlue || this.rng.chance(this.stats.blueChance))) {
+        kind = 'blue'
+        this.forceBlue = false
       }
       this.spawnPixel(r.x, r.y, kind, true)
     }
@@ -659,13 +612,13 @@ export class Game {
       d.phase += dt * 2
       if (d.cooldown > 0) d.cooldown -= dt
       let target = d.targetId !== null ? byId.get(d.targetId) : undefined
-      if (!target || target.kind === 'golden') {
+      if (!target || !droneCanTake(target)) {
         if (d.targetId !== null) claimed.delete(d.targetId)
         target = undefined
         d.targetId = null
         let best = Infinity
         for (const p of byId.values()) {
-          if (p.kind === 'golden' || claimed.has(p.id) || p.age < 0.15) continue
+          if (!droneCanTake(p) || claimed.has(p.id) || p.age < 0.15) continue
           const dist = Math.hypot(p.x - d.x, p.y - d.y)
           if (dist < best) {
             best = dist
@@ -704,98 +657,6 @@ export class Game {
         d.x = Math.max(4, Math.min(this.w - 4, d.x))
       }
     }
-  }
-
-  /**
-   * The fox strolls left and right along the ground, sitting for a while
-   * between walks. Once FOX FRIEND is bought it also leaps from wherever it is
-   * to the nearest pixel in range, catches it, and drops back to the ground.
-   */
-  private updateFox(dt: number): void {
-    const f = this.fox
-    const s = this.stats
-    if (f.phase === 'sit' || f.phase === 'walk') {
-      f.y = f.groundY
-      if (s.foxEnabled && !this.nuke) {
-        f.cooldown -= dt
-        if (f.cooldown <= 0) {
-          let target: Pixel | undefined
-          let best = s.foxRange
-          for (const p of this.pixels) {
-            if (p.dead || p.age < 0.2) continue
-            const d = Math.hypot(p.x - f.x, p.y - f.groundY)
-            if (d < best) {
-              best = d
-              target = p
-            }
-          }
-          if (target) {
-            this.foxLeap('out', target.x, target.y)
-            return
-          }
-          f.cooldown = 0.25
-        }
-      }
-      this.foxWander(dt)
-      return
-    }
-
-    f.t += dt
-    const p = Math.min(1, f.t / f.dur)
-    f.x = f.fromX + (f.toX - f.fromX) * p
-    f.y = f.fromY + (f.toY - f.fromY) * p - Math.sin(p * Math.PI) * f.arc
-    if (p < 1) return
-    if (f.phase === 'out') {
-      for (const px of this.pixels) {
-        if (!px.dead && Math.hypot(px.x - f.toX, px.y - f.toY) <= C.FOX_CATCH_RADIUS) this.destroy(px, 'fox', 0)
-      }
-      this.foxLeap('back', Math.max(f.minX, Math.min(f.maxX, f.toX)), f.groundY)
-    } else {
-      f.phase = 'sit'
-      f.rest = 0.6
-      f.cooldown = s.foxCooldown
-    }
-  }
-
-  private foxWander(dt: number): void {
-    const f = this.fox
-    const r = this.foxRng
-    if (f.phase === 'sit') {
-      f.rest -= dt
-      if (f.rest > 0) return
-      // Stroll somewhere new; head back toward the middle when near an edge.
-      let dir: 1 | -1 = r.chance(0.5) ? 1 : -1
-      if (f.x - f.minX < 25) dir = 1
-      else if (f.maxX - f.x < 25) dir = -1
-      f.walkTo = Math.max(f.minX, Math.min(f.maxX, f.x + dir * r.range(15, 70)))
-      f.facing = dir
-      f.phase = 'walk'
-      return
-    }
-    const step = C.FOX_WALK_SPEED * dt
-    const d = f.walkTo - f.x
-    if (Math.abs(d) <= step) {
-      f.x = f.walkTo
-      f.phase = 'sit'
-      f.rest = r.range(C.FOX_REST_MIN, C.FOX_REST_MAX)
-    } else {
-      f.x += Math.sign(d) * step
-      f.facing = d > 0 ? 1 : -1
-    }
-  }
-
-  private foxLeap(phase: 'out' | 'back', toX: number, toY: number): void {
-    const f = this.fox
-    const d = Math.hypot(toX - f.x, toY - f.y)
-    f.phase = phase
-    f.t = 0
-    f.dur = Math.min(C.FOX_LEG_MAX, C.FOX_LEG_MIN + d / 220)
-    f.fromX = f.x
-    f.fromY = f.y
-    f.toX = toX
-    f.toY = toY
-    f.arc = (phase === 'out' ? 16 : 6) + d * 0.3
-    if (Math.abs(toX - f.x) > 0.5) f.facing = toX > f.x ? 1 : -1
   }
 
   private updateBombs(dt: number): void {
@@ -964,5 +825,29 @@ export class Game {
       this.revision++
     }
   }
-}
 
+  private startRainbow(): void {
+    this.rainbow = Math.max(this.rainbow, this.stats.rainbowDuration)
+    this.emit({ type: 'rainbow-start', duration: this.rainbow })
+    this.revision++
+  }
+
+  private updateRainbow(dt: number): void {
+    if (this.rainbow > 0) {
+      this.rainbow = Math.max(0, this.rainbow - dt)
+      if (this.rainbow === 0) {
+        this.emit({ type: 'rainbow-end' })
+        this.revision++
+      }
+    }
+    // One rainbow pixel at a time, and never while the mode is already running.
+    if (!Number.isFinite(this.stats.rainbowInterval) || this.nuke || this.rainbow > 0) return
+    if (this.pixels.some((p) => p.kind === 'rainbow' && !p.dead)) return
+    this.rainbowTimer -= dt
+    if (this.rainbowTimer <= 0) {
+      this.rainbowTimer = this.stats.rainbowInterval
+      const pos = this.findSpawnPos()
+      this.spawnPixel(pos.x, pos.y, 'rainbow', false)
+    }
+  }
+}

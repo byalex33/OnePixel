@@ -1,4 +1,4 @@
-import { COMBO_STEP, FOX_LEVEL } from './config'
+import { BLUE_LEVEL, COMBO_STEP } from './config'
 import { hasFeature } from './levels'
 import type { FeatureId, SaveState, UpgradeId } from './types'
 
@@ -22,10 +22,11 @@ export const comboCap = (l: number) => (l <= 0 ? 0 : 10 + 5 * n(l))
 export const droneCount = (l: number, swarm: boolean) => (l <= 0 ? 0 : 1 + Math.floor((l - 1) / 3) + (swarm ? 2 : 0))
 export const droneCooldown = (l: number) => 1.5 * Math.pow(0.88, n(l))
 export const droneSpeed = (l: number) => 60 * Math.pow(1.07, n(l))
-export const foxCooldown = (l: number) => (l <= 0 ? Infinity : 4 * Math.pow(0.86, n(l)))
-export const foxRange = (l: number) => 75 + 8 * n(l)
 export const blastRadius = (l: number) => (l <= 0 ? 0 : 9 + 3 * n(l))
+export const blueChance = (l: number) => (l <= 0 ? 0 : Math.min(0.15, 0.05 + 0.01 * n(l)))
 export const goldenChance = (l: number) => (l <= 0 ? 0 : Math.min(0.25, 0.04 + 0.015 * n(l)))
+export const rainbowInterval = (l: number) => (l <= 0 ? Infinity : 40 * Math.pow(0.9, n(l)))
+export const rainbowDuration = (l: number) => 2 + 0.25 * n(l)
 export const chainChance = (l: number) => (l <= 0 ? 0 : Math.min(0.55, 0.06 + 0.05 * n(l)))
 export const bombInterval = (l: number) => (l <= 0 ? Infinity : 14 * Math.pow(0.88, n(l)))
 export const bombRadius = (l: number) => 24 + 2 * n(l)
@@ -58,10 +59,12 @@ export interface Stats {
   droneCooldown: number
   droneSpeed: number
   blastRadius: number
-  foxEnabled: boolean
-  foxCooldown: number
-  foxRange: number
   goldenChance: number
+  /** Odds a respawning pixel comes back blue (bonus XP). */
+  blueChance: number
+  /** Seconds between rainbow pixels, and how long rainbow mode lasts. */
+  rainbowInterval: number
+  rainbowDuration: number
   chainChance: number
   bombInterval: number
   bombRadius: number
@@ -94,10 +97,10 @@ export function computeStats(s: SaveState): Stats {
     droneCooldown: droneCooldown(u.auto) * oc,
     droneSpeed: droneSpeed(u.auto),
     blastRadius: has('blast', 'blast') ? blastRadius(u.blast) : 0,
-    foxEnabled: u.fox > 0 && s.level >= FOX_LEVEL,
-    foxCooldown: foxCooldown(u.fox),
-    foxRange: foxRange(u.fox),
     goldenChance: has('golden', 'golden') ? goldenChance(u.golden) : 0,
+    blueChance: u.blue > 0 && s.level >= BLUE_LEVEL ? blueChance(u.blue) : 0,
+    rainbowInterval: has('rainbow', 'rainbow') ? rainbowInterval(u.rainbow) : Infinity,
+    rainbowDuration: rainbowDuration(u.rainbow),
     chainChance: has('chain', 'chain') ? chainChance(u.chain) : 0,
     bombInterval: has('bomb', 'bomb') ? bombInterval(u.bomb) * oc : Infinity,
     bombRadius: bombRadius(u.bomb),

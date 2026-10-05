@@ -1,4 +1,4 @@
-import { FOX_LEVEL, UPGRADES_UNLOCK_LEVEL } from './config'
+import { BLUE_LEVEL, BLUE_XP_MULT, UPGRADES_UNLOCK_LEVEL } from './config'
 import * as F from './formulas'
 import { hasFeature, levelForFeature } from './levels'
 import type { FeatureId, SaveState, UpgradeId } from './types'
@@ -36,7 +36,7 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'multi', name: 'EXTRA PIXEL', desc: 'One more pixel in the arena.', requires: 'second', baseCost: 12, growth: 2.9, max: 17, show: (l) => `${l + 1} px` },
   { id: 'critChance', name: 'CRIT CHANCE', desc: 'Unlock critical hits. Levels raise the odds.', requires: 'crit', baseCost: 80, growth: 2.0, max: 13, show: (l) => off(l, () => pct(F.critChance(l))) },
   { id: 'critPower', name: 'CRIT POWER', desc: 'Critical hits pay out more.', requires: 'crit', baseCost: 150, growth: 2.1, max: 20, show: (l) => x(F.critMult(l)) },
-  { id: 'fox', name: 'FOX FRIEND', desc: 'Your fox leaps to catch nearby pixels, golden ones too. Levels: more often, further.', minLevel: FOX_LEVEL, baseCost: 60, growth: 2.3, max: 12, show: (l) => off(l, () => s(F.foxCooldown(l))) },
+  { id: 'blue', name: 'BLUE PIXELS', desc: `Unlock blue pixels worth x${BLUE_XP_MULT} XP. Levels make them more common.`, minLevel: BLUE_LEVEL, baseCost: 60, growth: 2.3, max: 12, show: (l) => off(l, () => pct(F.blueChance(l))) },
   { id: 'combo', name: 'COMBOS', desc: 'Unlock combos: quick pops stack +3% each. Levels raise the cap.', requires: 'combo', baseCost: 120, growth: 2.0, max: 13, show: (l) => off(l, () => `${F.comboCap(l)} stk`) },
   { id: 'xp', name: 'XP GAIN', desc: 'More XP from every pixel.', requires: 'combo', baseCost: 100, growth: 2.15, max: 20, show: (l) => x(F.xpMult(l)) },
   { id: 'blast', name: 'BLAST RADIUS', desc: 'Unlock explosive taps that hit nearby pixels. Levels grow the blast.', requires: 'blast', baseCost: 350, growth: 2.15, max: 16, show: (l) => off(l, () => u(F.blastRadius(l))) },
@@ -52,6 +52,7 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'cluster', name: 'CLUSTER BOMBS', desc: 'Bombs scatter three bomblets when they burst.', requires: 'cluster', baseCost: 400_000, growth: 1, max: 1, show: perk },
   { id: 'twin', name: 'TWIN LASERS', desc: 'Every laser strike fires two beams.', requires: 'twin', baseCost: 1_500_000, growth: 1, max: 1, show: perk },
   { id: 'goldRain', name: 'GOLDEN STORMS', desc: 'Pixel rain carries golden pixels.', requires: 'goldRain', baseCost: 5_000_000, growth: 1, max: 1, show: perk },
+  { id: 'rainbow', name: 'RAINBOW MODE', desc: 'Rare rainbow pixels. Pop one and every pixel pays x5 while it lasts. Levels: more often, longer.', requires: 'rainbow', baseCost: 12_000_000, growth: 2.2, max: 9, show: (l) => off(l, () => `${Math.round(F.rainbowInterval(l))}s/${F.rainbowDuration(l).toFixed(2)}s`) },
   { id: 'overclock', name: 'OVERCLOCK', desc: 'Drones, bombs, lasers and storms run 25% faster.', requires: 'overclock', baseCost: 30_000_000, growth: 1, max: 1, show: perk },
 ]
 

@@ -2,8 +2,10 @@ import type { IconType } from 'react-icons'
 import {
   GiAtom,
   GiClusterBomb,
+  GiCrystalShine,
   GiRadarSweep,
   GiRaining,
+  GiRainbowStar,
   GiSpeedometer,
   GiLaserWarning,
   GiBrain,
@@ -11,7 +13,6 @@ import {
   GiCrosshair,
   GiDeliveryDrone,
   GiExplosionRays,
-  GiFox,
   GiGoldBar,
   GiHeavyRain,
   GiHourglass,
@@ -33,7 +34,6 @@ export const UPGRADE_ICONS: Record<UpgradeId, IconType> = {
   critPower: GiPowerLightning,
   xp: GiBrain,
   combo: GiLightningArc,
-  fox: GiFox,
   auto: GiDeliveryDrone,
   blast: GiExplosionRays,
   golden: GiGoldBar,
@@ -48,4 +48,6 @@ export const UPGRADE_ICONS: Record<UpgradeId, IconType> = {
   twin: GiLaserWarning,
   goldRain: GiRaining,
   overclock: GiSpeedometer,
+  rainbow: GiRainbowStar,
+  blue: GiCrystalShine,
 }

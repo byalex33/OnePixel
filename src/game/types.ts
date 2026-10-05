@@ -20,7 +20,8 @@ export type UpgradeId =
   | 'twin'
   | 'goldRain'
   | 'overclock'
-  | 'fox'
+  | 'rainbow'
+  | 'blue'
 
 export type FeatureId =
   | 'second'
@@ -38,6 +39,7 @@ export type FeatureId =
   | 'cluster'
   | 'twin'
   | 'goldRain'
+  | 'rainbow'
   | 'overclock'
   | 'signal'
 
@@ -49,6 +51,7 @@ export interface LifetimeStats {
   manualKills: number
   crits: number
   goldenKills: number
+  blueKills: number
   droneKills: number
   bombKills: number
   laserKills: number
@@ -62,7 +65,6 @@ export interface LifetimeStats {
   bestLaser: number
   bestStorm: number
   mostOnScreen: number
-  foxKills: number
   playTime: number
 }
 
@@ -88,8 +90,8 @@ export interface SaveState {
   settings: Settings
 }
 
-export type PixelKind = 'normal' | 'golden' | 'rain'
-export type Cause = 'click' | 'drone' | 'chain' | 'bomb' | 'laser' | 'nuke' | 'fox'
+export type PixelKind = 'normal' | 'golden' | 'blue' | 'rain' | 'rainbow'
+export type Cause = 'click' | 'drone' | 'chain' | 'bomb' | 'laser' | 'nuke'
 
 export type GameEvent =
   | {
@@ -109,7 +111,9 @@ export type GameEvent =
   | { type: 'bomb-drop'; x: number; y: number }
   | { type: 'laser-fire'; x1: number; y1: number; x2: number; y2: number }
   | { type: 'drone-zap'; x1: number; y1: number; x2: number; y2: number }
-  | { type: 'golden-expire'; x: number; y: number }
+  | { type: 'expire'; x: number; y: number; kind: PixelKind }
+  | { type: 'rainbow-start'; duration: number }
+  | { type: 'rainbow-end' }
   | { type: 'rain-start' }
   | { type: 'rain-end'; caught: number }
   | { type: 'nuke-warn' }

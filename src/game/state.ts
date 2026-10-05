@@ -13,6 +13,7 @@ export function emptyStats(): LifetimeStats {
     manualKills: 0,
     crits: 0,
     goldenKills: 0,
+    blueKills: 0,
     droneKills: 0,
     bombKills: 0,
     laserKills: 0,
@@ -26,7 +27,6 @@ export function emptyStats(): LifetimeStats {
     bestLaser: 0,
     bestStorm: 0,
     mostOnScreen: 0,
-    foxKills: 0,
     playTime: 0,
   }
 }

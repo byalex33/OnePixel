@@ -22,7 +22,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'crowd', name: 'CROWDED', desc: 'Have 5 pixels on screen at once.', check: (s) => s.stats.mostOnScreen >= 5 },
   { id: 'drone', name: 'AUTOMATION', desc: 'Drones destroy 100 pixels.', check: (s) => s.stats.droneKills >= 100 },
   { id: 'multi', name: 'TRIPLE TAP', desc: 'Destroy 3 pixels with one tap.', check: (s) => s.stats.bestMultiClick >= 3 },
-  { id: 'fox', name: 'GOOD FOX', desc: 'Your fox catches 25 pixels.', check: (s) => s.stats.foxKills >= 25 },
+  { id: 'blue', name: 'FEELING BLUE', desc: 'Catch 25 blue pixels.', check: (s) => s.stats.blueKills >= 25 },
   { id: 'gold', name: 'MIDAS', desc: 'Catch a golden pixel.', check: (s) => s.stats.goldenKills >= 1 },
   { id: 'gold25', name: 'GOLD HOARDER', desc: 'Catch 25 golden pixels.', check: (s) => s.stats.goldenKills >= 25 },
   { id: 'chain', name: 'CHAIN GANG', desc: 'One chain reaction destroys 6 pixels.', check: (s) => s.stats.bestChain >= 6 },

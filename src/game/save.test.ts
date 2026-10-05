@@ -138,6 +138,22 @@ describe('save files', () => {
     expect(s.settings.sound).toBe(true)
   })
 
+  it('load saves from before the fox was removed', () => {
+    const s = sanitizeState({
+      level: 5,
+      upgrades: { respawn: 2, fox: 4 },
+      achievements: ['first', 'fox'],
+      seenUpgrades: ['respawn', 'fox'],
+      stats: { kills: 50, foxKills: 30 },
+    })
+    expect(s.upgrades.respawn).toBe(2)
+    expect('fox' in s.upgrades).toBe(false)
+    expect(s.achievements).toEqual(['first'])
+    expect(s.seenUpgrades).toEqual(['respawn'])
+    expect(s.stats.kills).toBe(50)
+    expect('foxKills' in s.stats).toBe(false)
+  })
+
   it('persist to and load from storage, surviving corruption', () => {
     const store = new MemStore()
     const s = createInitialState()

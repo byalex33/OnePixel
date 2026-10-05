@@ -1,18 +1,17 @@
 import { useState } from 'react'
 import type { IconType } from 'react-icons'
-import { GiCog, GiLevelEndFlag, GiTrophy, GiUpgrade } from 'react-icons/gi'
+import { GiCog, GiTrophy, GiUpgrade } from 'react-icons/gi'
 import { ACHIEVEMENTS } from '../game/achievements'
 import { costOf, isMaxed, isUnlocked, UPGRADES } from '../game/upgrades'
 import { useRuntime } from './hooks'
-import { AchievementsTab, LevelsTab } from './ProgressTabs'
+import { AchievementsTab } from './ProgressTabs'
 import { SystemTab } from './SystemTab'
 import { UpgradesTab } from './UpgradesTab'
 
-type Tab = 'upg' | 'lvl' | 'ach' | 'sys'
+type Tab = 'upg' | 'ach' | 'sys'
 
 const TABS: { id: Tab; label: string; icon: IconType }[] = [
   { id: 'upg', label: 'UPGRADES', icon: GiUpgrade },
-  { id: 'lvl', label: 'LEVELS', icon: GiLevelEndFlag },
   { id: 'ach', label: 'FEATS', icon: GiTrophy },
   { id: 'sys', label: 'SYSTEM', icon: GiCog },
 ]
@@ -32,8 +31,6 @@ export function Panel({ desktop }: { desktop: boolean }) {
     }
   }
 
-  const title = TABS.find((t) => t.id === tab)!.label
-
   return (
     <aside
       className={`dots relative z-10 flex shrink-0 flex-col ${
@@ -43,7 +40,7 @@ export function Panel({ desktop }: { desktop: boolean }) {
     >
       {desktop && (
         <div className="flex items-center justify-between border-b-2 border-line bg-bg px-4 py-3">
-          <h1 className="font-pixel text-[12px] tracking-widest text-hi">{title}</h1>
+          <h1 className="font-pixel text-[12px] tracking-widest text-hi">OnePixel</h1>
           <span className="font-pixel text-[8px] text-mute">{tab === 'ach' ? `${s.achievements.length}/${ACHIEVEMENTS.length}` : `LV ${s.level}`}</span>
         </div>
       )}
@@ -84,7 +81,6 @@ export function Panel({ desktop }: { desktop: boolean }) {
       {(desktop || open) && (
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
           {tab === 'upg' && <UpgradesTab />}
-          {tab === 'lvl' && <LevelsTab />}
           {tab === 'ach' && <AchievementsTab />}
           {tab === 'sys' && <SystemTab />}
         </div>

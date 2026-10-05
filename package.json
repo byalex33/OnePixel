@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "balance": "vitest run src/game/balance.test.ts --reporter verbose",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "trailer": "node scripts/trailer.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",
