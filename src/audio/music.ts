@@ -6,6 +6,7 @@
  */
 
 const VOLUME = 0.35
+const FADE_IN = 0.8 // seconds
 const BAR = 6.4 // seconds per chord
 const STEPS = 8 // melody slots per bar
 const LOOKAHEAD = 0.6 // seconds scheduled ahead of the clock
@@ -76,7 +77,7 @@ export class Music {
     g.cancelScheduledValues(now)
     g.setValueAtTime(g.value, now)
     if (this.enabled && !this.paused) {
-      g.linearRampToValueAtTime(VOLUME, now + 3)
+      g.linearRampToValueAtTime(VOLUME, now + FADE_IN)
       if (!this.timer) {
         this.nextAt = now + 0.1
         this.step = 0
@@ -128,7 +129,7 @@ export class Music {
     const peak = 0.045
     const end = t + BAR + 1.5
     g.gain.setValueAtTime(0, t)
-    g.gain.linearRampToValueAtTime(peak, t + 1.8)
+    g.gain.linearRampToValueAtTime(peak, t + 0.8)
     g.gain.setValueAtTime(peak, t + BAR - 0.5)
     g.gain.linearRampToValueAtTime(0, end)
     filter.connect(g).connect(this.bus!)

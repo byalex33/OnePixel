@@ -15,6 +15,8 @@ export type Notice =
 
 const MAX_STEPS_PER_FRAME = 15
 const UI_INTERVAL = 0.1
+// Events browsers accept as a user gesture for starting audio (pointerdown only counts for mice).
+const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'keydown'] as const
 
 function safeStorage(): KeyValueStore | null {
   try {
@@ -99,6 +101,7 @@ export class Runtime {
     this.last = performance.now()
     document.addEventListener('visibilitychange', this.onVisibility)
     window.addEventListener('pagehide', this.onPageHide)
+    for (const e of GESTURES) window.addEventListener(e, this.unlockAudio, { capture: true, passive: true })
     this.raf = requestAnimationFrame(this.frame)
   }
 
@@ -107,6 +110,7 @@ export class Runtime {
     this.raf = 0
     document.removeEventListener('visibilitychange', this.onVisibility)
     window.removeEventListener('pagehide', this.onPageHide)
+    for (const e of GESTURES) window.removeEventListener(e, this.unlockAudio, { capture: true })
   }
 
   private onPageHide = () => this.save()
@@ -244,34 +248,31 @@ export class Runtime {
 
   // ---------------------------------------------------------------- actions
 
-  private unlockAudio(): void {
+  /** Any gesture on the page starts (or resumes) audio, not just taps on the arena. */
+  private unlockAudio = (): void => {
     this.sfx.unlock()
     this.music.attach(this.sfx.context)
   }
 
   pointer(cssX: number, cssY: number): void {
-    this.unlockAudio()
     if (!this.renderer) return
     const { x, y } = this.renderer.toWorld(cssX, cssY)
     this.game.pointerDown(x, y)
   }
 
   buy(id: UpgradeId): boolean {
-    this.unlockAudio()
     const ok = this.game.buy(id)
     this.bump()
     return ok
   }
 
   buyMax(id: UpgradeId): number {
-    this.unlockAudio()
     const n = this.game.buyMax(id)
     this.bump()
     return n
   }
 
   launchNuke(): void {
-    this.unlockAudio()
     if (this.game.launchNuke()) this.bump()
   }
 
