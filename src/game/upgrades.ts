@@ -54,6 +54,7 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'goldRain', name: 'GOLDEN STORMS', desc: 'Pixel rain carries golden pixels.', requires: 'goldRain', baseCost: 5_000_000, growth: 1, max: 1, show: perk },
   { id: 'rainbow', name: 'RAINBOW MODE', desc: 'Rare rainbow pixels. Pop one and every pixel pays x5 while it lasts. Levels: more often, longer.', requires: 'rainbow', baseCost: 12_000_000, growth: 2.2, max: 9, show: (l) => off(l, () => `${Math.round(F.rainbowInterval(l))}s/${F.rainbowDuration(l).toFixed(2)}s`) },
   { id: 'overclock', name: 'OVERCLOCK', desc: 'Drones, bombs, lasers and storms run 25% faster.', requires: 'overclock', baseCost: 30_000_000, growth: 1, max: 1, show: perk },
+  { id: 'pierce', name: 'ARMOR PIERCING', desc: 'Every hit on the boss does more damage.', requires: 'boss', baseCost: 80_000_000, growth: 1.8, max: 25, show: (l) => x(F.pierceMult(l)) },
 ]
 
 export const UPGRADE_MAP = Object.fromEntries(UPGRADES.map((d) => [d.id, d])) as Record<UpgradeId, UpgradeDef>

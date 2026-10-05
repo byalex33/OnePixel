@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_OFFLINE_SECONDS, SAVE_KEY, SAVE_VERSION } from './config'
+import { BOSS_FIRST_DELAY, BOSS_INTERVAL, MAX_OFFLINE_SECONDS, SAVE_KEY, SAVE_VERSION } from './config'
 import { computeStats } from './formulas'
 import { automationKillRate, offlineGains, offlineSeconds } from './offline'
 import { SaveError, exportSave, importSave, loadFrom, makeSaveFile, parseSaveFile, sanitizeState, writeTo, type KeyValueStore } from './save'
@@ -153,6 +153,17 @@ describe('save files', () => {
     expect(s.seenUpgrades).toEqual(['respawn'])
     expect(s.stats.kills).toBe(50)
     expect('foxKills' in s.stats).toBe(false)
+  })
+
+  it('load saves from before the boss with its defaults, and clamp hostile boss values', () => {
+    const old = sanitizeState({ level: 20, stats: { kills: 9 } })
+    expect(old.bossTimer).toBe(BOSS_FIRST_DELAY)
+    expect(old.bossHealth).toBe(1)
+    expect(old.stats.bossKills).toBe(0)
+    const hostile = sanitizeState({ bossTimer: 1e12, bossHealth: -4, stats: { bossKills: 'lots' } })
+    expect(hostile.bossTimer).toBe(BOSS_INTERVAL)
+    expect(hostile.bossHealth).toBeGreaterThan(0)
+    expect(hostile.stats.bossKills).toBe(0)
   })
 
   it('persist to and load from storage, surviving corruption', () => {

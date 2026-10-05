@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BOSS_FIGHT_TIME } from './config'
 import { runBot } from './bot'
 import { fmt, fmtTime } from './format'
 
@@ -55,5 +56,37 @@ describe('balance', () => {
     for (let i = 1; i < early.length; i++) maxGap = Math.max(maxGap, early[i] - early[i - 1])
     expect(early.length).toBeGreaterThan(20)
     expect(maxGap).toBeLessThan(90)
+  })
+
+})
+
+/*
+ * The boss arrives at level 20, hours in, so it gets its own long run.
+ */
+describe('boss pacing', () => {
+  const run = runBot({ cps: 3, reaction: 0.3, seconds: 6 * 3600, seed: 7 })
+  const l20 = run.levelTimes.get(20) ?? Infinity
+  const log = run.bossLog
+
+  it('prints the boss log', () => {
+    const fights = log.map((f) => `T${f.tier}${f.outcome === 'escape' ? ' escaped' : ''}@${Math.round(f.secs)}s`).join(' ')
+    console.log(`engaged: L20@${fmtTime(l20)}, ${run.game.state.stats.bossKills} bosses down, ${run.game.state.stats.bossEscapes} escaped\n  ${fights}`)
+    expect(true).toBe(true)
+  })
+
+  it('the first boss is a fight, not a formality', () => {
+    expect(log[0]?.outcome).toBe('defeat')
+    expect(log[0].secs).toBeGreaterThan(12)
+    expect(log[0].secs).toBeLessThan(BOSS_FIGHT_TIME)
+  })
+
+  it('later tiers start to escape', () => {
+    expect(log.some((f) => f.outcome === 'escape')).toBe(true)
+  })
+
+  it('no tier is a wall: wounds carry over, so the bot keeps climbing', () => {
+    const lastTwoHours = log.filter((f) => f.t > run.game.state.stats.playTime - 2 * 3600)
+    expect(lastTwoHours.some((f) => f.outcome === 'defeat')).toBe(true)
+    expect(run.game.state.stats.bossKills).toBeGreaterThanOrEqual(8)
   })
 })

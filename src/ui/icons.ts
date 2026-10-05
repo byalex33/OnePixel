@@ -2,6 +2,7 @@ import type { IconType } from 'react-icons'
 import {
   GiAtom,
   GiClusterBomb,
+  GiCrackedShield,
   GiCrystalShine,
   GiRadarSweep,
   GiRaining,
@@ -50,4 +51,5 @@ export const UPGRADE_ICONS: Record<UpgradeId, IconType> = {
   overclock: GiSpeedometer,
   rainbow: GiRainbowStar,
   blue: GiCrystalShine,
+  pierce: GiCrackedShield,
 }

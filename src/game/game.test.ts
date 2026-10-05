@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as C from './config'
 import * as F from './formulas'
 import { xpToNext } from './formulas'
-import { Game, type Pixel } from './game'
+import { Game, type Boss, type Pixel } from './game'
 import { createInitialState } from './state'
 import type { GameEvent, SaveState } from './types'
 import { costOf, isUnlocked, maxPurchase, UPGRADE_MAP } from './upgrades'
@@ -488,5 +488,238 @@ describe('simulation', () => {
     run(g, 0.6)
     expect(g.state.achievements).toContain('first')
     expect(g.stats.value).toBeCloseTo(1.02)
+  })
+})
+
+describe('the boss', () => {
+  /** A level 20 game with an empty arena and a boss parked dead centre, ready to fight. */
+  function fight(patch: (s: SaveState) => void = () => {}, seed = 1): { g: Game; b: Boss } {
+    const g = makeGame((s) => {
+      s.level = 20
+      patch(s)
+    }, seed)
+    g.pixels = []
+    g.respawns = []
+    const b = g.spawnBoss()
+    run(g, C.BOSS_RISE + C.DT)
+    g.pixels = []
+    g.respawns = []
+    Object.assign(b, { x: 120, y: 80, vx: 0, vy: 0 })
+    g.drainEvents()
+    return { g, b }
+  }
+  const hits = (events: GameEvent[]) => events.filter((e): e is Extract<GameEvent, { type: 'boss-hit' }> => e.type === 'boss-hit')
+
+  it('stays below the grid before level 20', () => {
+    const g = makeGame((s) => (s.level = 19))
+    const events = run(g, C.BOSS_FIRST_DELAY + 5)
+    expect(g.boss).toBeNull()
+    expect(events.some((e) => e.type === 'boss-rise')).toBe(false)
+  })
+
+  it('surfaces shortly after reaching level 20, then joins the fight', () => {
+    const g = makeGame((s) => (s.level = 20))
+    const events = run(g, C.BOSS_FIRST_DELAY + 0.1)
+    expect(events.some((e) => e.type === 'boss-rise')).toBe(true)
+    expect(g.boss?.phase).toBe('rise')
+    expect(g.boss?.maxHp).toBe(F.bossMaxHp(1))
+    expect(g.state.bossTimer).toBe(0)
+    run(g, C.BOSS_RISE)
+    expect(g.boss?.phase).toBe('fight')
+  })
+
+  it('cannot be hurt while it is still rising', () => {
+    const g = makeGame((s) => (s.level = 20))
+    g.pixels = []
+    const b = g.spawnBoss()
+    g.pointerDown(b.x, b.y)
+    expect(b.hp).toBe(b.maxHp)
+    expect(g.drainEvents().some((e) => e.type === 'miss')).toBe(true)
+  })
+
+  it('taps on its body hurt it; taps elsewhere miss', () => {
+    const { g, b } = fight()
+    g.pointerDown(120 + b.r, 80 - b.r)
+    expect(b.hp).toBe(b.maxHp - C.BOSS_DAMAGE.click)
+    g.pointerDown(20, 20)
+    expect(b.hp).toBe(b.maxHp - C.BOSS_DAMAGE.click)
+    expect(g.drainEvents().some((e) => e.type === 'miss')).toBe(true)
+  })
+
+  it('tapping it keeps the combo going, and the combo boosts tap damage', () => {
+    const { g, b } = fight((s) => (s.upgrades.combo = 1))
+    for (let i = 0; i < 5; i++) g.pointerDown(120, 80)
+    expect(g.combo.count).toBe(5)
+    let expected = 0
+    for (let i = 1; i <= 5; i++) expected += C.BOSS_DAMAGE.click * F.comboMult(i, g.stats.comboCap)
+    expect(b.maxHp - b.hp).toBeCloseTo(expected)
+  })
+
+  it('one tap can hit the boss and a pixel at the same time', () => {
+    const { g, b } = fight()
+    const p = addPixel(g, 120 + b.r + 2, 80)
+    g.pointerDown(120 + b.r + 2, 80)
+    expect(p.dead).toBe(true)
+    expect(b.hp).toBeLessThan(b.maxHp)
+  })
+
+  it('drones, bombs, bomblets, chains and lasers all chip away at it', () => {
+    const { g, b } = fight((s) => (s.upgrades.auto = 1))
+    const drone = hits(run(g, 3))
+    expect(drone.length).toBeGreaterThan(0)
+    expect(drone.every((e) => e.source === 'drone' && e.dmg === C.BOSS_DAMAGE.drone)).toBe(true)
+
+    const blastAt = (cause: 'bomb' | 'chain', r: number, mini: boolean) =>
+      g['blasts'].push({ x: 120, y: 80 + b.r + r / 2, r, delay: 0, cause, group: 0, depth: 1, mini })
+    blastAt('bomb', 30, false)
+    blastAt('bomb', C.BOMBLET_RADIUS, true)
+    blastAt('chain', C.CHAIN_RADIUS, false)
+    g.lasers.push({ x1: -500, y1: 80, x2: 500, y2: 80, t: 0.001, phase: 'charge', group: 0 })
+    g.drones = []
+    const sources = hits(run(g, 0.05)).map((e) => [e.source, e.dmg])
+    expect(sources).toEqual(
+      expect.arrayContaining([
+        ['bomb', C.BOSS_DAMAGE.bomb],
+        ['bomblet', C.BOSS_DAMAGE.bomblet],
+        ['chain', C.BOSS_DAMAGE.chain],
+        ['laser', C.BOSS_DAMAGE.laser],
+      ]),
+    )
+  })
+
+  it('only taps can crit it', () => {
+    const { g } = fight((s) => {
+      s.upgrades.critChance = 13
+      s.upgrades.auto = 1
+    })
+    let tapCrits = 0
+    for (let i = 0; i < 40; i++) {
+      g.pointerDown(120, 80)
+      tapCrits += hits(g.drainEvents()).filter((e) => e.crit).length
+    }
+    expect(tapCrits).toBeGreaterThan(5)
+    const machine = hits(run(g, 3)).filter((e) => e.source === 'drone')
+    expect(machine.length).toBeGreaterThan(0)
+    expect(machine.every((e) => !e.crit && e.dmg === C.BOSS_DAMAGE.drone)).toBe(true)
+  })
+
+  it('armor piercing multiplies every hit', () => {
+    const { g, b } = fight((s) => (s.upgrades.pierce = 4))
+    g.pointerDown(120, 80)
+    expect(b.maxHp - b.hp).toBeCloseTo(C.BOSS_DAMAGE.click * F.pierceMult(4))
+  })
+
+  it('a nuke takes a fixed chunk, but only once per fight', () => {
+    const { g, b } = fight((s) => (s.upgrades.nukeCharge = 1))
+    for (let i = 0; i < 2; i++) {
+      g.state.nukeCharge = g.stats.nukeKills
+      expect(g.launchNuke()).toBe(true)
+      run(g, C.NUKE_WARMUP + 0.05)
+    }
+    expect(b.hp).toBeCloseTo(b.maxHp * (1 - C.BOSS_NUKE_FRACTION))
+  })
+
+  it('swallows a nearby pixel to heal, and the pixel pays nothing', () => {
+    const { g, b } = fight()
+    b.hp = b.maxHp * 0.6
+    const p = addPixel(g, 120 + b.r + 4, 80)
+    p.slot = true
+    b.eatTimer = 0.01
+    const pixelsBefore = g.state.pixels
+    const events = run(g, 0.05)
+    expect(p.dead).toBe(true)
+    expect(events.some((e) => e.type === 'boss-eat')).toBe(true)
+    expect(b.hp).toBeCloseTo(b.maxHp * (0.6 + C.BOSS_EAT_HEAL))
+    expect(g.state.pixels).toBe(pixelsBefore)
+    expect(g.state.stats.kills).toBe(0)
+    expect(g.respawns.length).toBeGreaterThan(0)
+  })
+
+  it('leaves golden and rainbow pixels alone', () => {
+    const { g, b } = fight()
+    const p = addPixel(g, 120 + b.r + 4, 80, 'golden')
+    b.eatTimer = 0.01
+    run(g, 0.05)
+    expect(p.dead).toBe(false)
+  })
+
+  it('enrages below half health', () => {
+    const { g, b } = fight()
+    b.hp = b.maxHp * C.BOSS_ENRAGE_AT + 5
+    g.pointerDown(120, 80)
+    expect(b.enraged).toBe(true)
+    expect(g.drainEvents().some((e) => e.type === 'boss-enrage')).toBe(true)
+  })
+
+  it('defeat pays out, drops golden loot, adds a permanent bonus and toughens the next one', () => {
+    const { g, b } = fight()
+    b.hp = 1
+    const value = g.stats.value
+    const xp = g.state.xp
+    g.pointerDown(120, 80)
+    const defeat = g.drainEvents().find((e) => e.type === 'boss-defeat')
+    if (!defeat || defeat.type !== 'boss-defeat') throw new Error('no defeat event')
+    expect(g.boss).toBeNull()
+    expect(defeat.amount).toBeCloseTo(value * C.BOSS_REWARD_VALUE)
+    expect(g.state.xp - xp).toBeCloseTo(xpToNext(20) * C.BOSS_REWARD_XP_FRAC)
+    expect(g.pixels.filter((p) => p.kind === 'golden')).toHaveLength(C.BOSS_LOOT_BASE + C.BOSS_LOOT_PER_TIER)
+    expect(g.state.stats.bossKills).toBe(1)
+    expect(g.state.bossTimer).toBe(C.BOSS_INTERVAL)
+    expect(g.stats.value).toBeCloseTo(value * F.bossBonus(1))
+    const next = g.spawnBoss()
+    expect(next.tier).toBe(2)
+    expect(next.maxHp).toBeGreaterThan(b.maxHp)
+  })
+
+  it('escapes when time runs out, and comes back with its wounds', () => {
+    const { g, b } = fight()
+    b.hp = b.maxHp * 0.4
+    b.timeLeft = 0.01
+    const events = run(g, 0.05)
+    expect(events.some((e) => e.type === 'boss-escape')).toBe(true)
+    expect(b.phase).toBe('sink')
+    g.pointerDown(120, 80)
+    expect(b.hp).toBeCloseTo(b.maxHp * 0.4) // can't be hurt on the way down
+    expect(g.state.stats.bossEscapes).toBe(1)
+    expect(g.state.bossTimer).toBe(C.BOSS_INTERVAL)
+    expect(g.state.bossHealth).toBeCloseTo(0.4 + C.BOSS_ESCAPE_RECOVER)
+    run(g, C.BOSS_SINK)
+    expect(g.boss).toBeNull()
+
+    g.state.bossTimer = 0.01
+    run(g, 0.05)
+    expect(g.boss?.tier).toBe(1)
+    expect(g.boss?.hp).toBeCloseTo(b.maxHp * (0.4 + C.BOSS_ESCAPE_RECOVER), 0)
+  })
+
+  it('reloading mid-fight brings it straight back', () => {
+    const { g } = fight()
+    const reloaded = new Game(structuredClone(g.state), 2)
+    reloaded.resize(240, 160)
+    const events = run(reloaded, 0.05)
+    expect(events.some((e) => e.type === 'boss-rise')).toBe(true)
+  })
+
+  it('moves with the arena when it is resized', () => {
+    const { g, b } = fight()
+    g.resize(480, 80)
+    expect(b.x).toBeCloseTo(240)
+    expect(b.y).toBeCloseTo(40)
+  })
+
+  it('fights deterministically for a given seed', () => {
+    const play = () => {
+      const { g, b } = fight((s) => {
+        s.upgrades.auto = 7
+        s.upgrades.multi = 8
+        s.upgrades.critChance = 5
+      }, 9)
+      for (let i = 0; i < 1200; i++) {
+        if (i % 15 === 0 && g.boss) g.pointerDown(g.boss.x, g.boss.y)
+        g.tick(C.DT)
+      }
+      return [b.hp, b.x, b.y, g.state.pixels]
+    }
+    expect(play()).toEqual(play())
   })
 })

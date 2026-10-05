@@ -1,9 +1,10 @@
 import * as C from './config'
 import { ACHIEVEMENTS } from './achievements'
-import { comboMult, computeStats, xpToNext, type Stats } from './formulas'
+import { bossMaxHp, comboMult, computeStats, xpToNext, type Stats } from './formulas'
+import { hasFeature } from './levels'
 import { Rng } from './rng'
 import { createInitialState } from './state'
-import type { Cause, GameEvent, PixelKind, SaveState, UpgradeId } from './types'
+import type { BossDamageSource, Cause, GameEvent, PixelKind, SaveState, UpgradeId } from './types'
 import { costOf, isMaxed, isUnlocked } from './upgrades'
 
 export interface Pixel {
@@ -66,6 +67,31 @@ interface PendingBlast {
   cause: Cause
   group: number
   depth: number
+  /** A cluster bomblet rather than a full bomb. */
+  mini?: boolean
+}
+
+export interface Boss {
+  x: number
+  y: number
+  /** Unit heading; speed depends on whether it is enraged. */
+  vx: number
+  vy: number
+  /** Half the width of its square body. */
+  r: number
+  hp: number
+  maxHp: number
+  tier: number
+  /** Rising out of the grid, fighting, or sinking back after escaping. */
+  phase: 'rise' | 'fight' | 'sink'
+  /** Seconds into the current rise or sink. */
+  t: number
+  /** Seconds left before it escapes. */
+  timeLeft: number
+  eatTimer: number
+  enraged: boolean
+  /** It only takes nuke damage once per fight. */
+  nuked: boolean
 }
 
 export interface Rect {
@@ -78,6 +104,8 @@ export interface Rect {
 const MAX_EVENTS = 800
 /** Golden and rainbow pixels are left for the player. */
 const droneCanTake = (p: Pixel) => p.kind !== 'golden' && p.kind !== 'rainbow'
+/** Drone target id meaning "the boss" rather than a pixel. */
+const BOSS_TARGET = -1
 const EARN_BINS = 10
 const EARN_BIN_SECONDS = 0.5
 
@@ -105,6 +133,7 @@ export class Game {
   combo = { count: 0, timer: 0 }
   rain = { active: false, remaining: 0, acc: 0, caught: 0 }
   nuke: { t: number } | null = null
+  boss: Boss | null = null
   frenzy = 0
   /** Seconds of rainbow mode left; every pixel pays x5 while it runs. */
   rainbow = 0
@@ -155,6 +184,7 @@ export class Game {
     this.drones.forEach(scaleAll)
     this.bombs.forEach(scaleAll)
     this.blasts.forEach(scaleAll)
+    if (this.boss) scaleAll(this.boss)
     for (const l of this.lasers) {
       l.x1 *= sx
       l.x2 *= sx
@@ -163,6 +193,23 @@ export class Game {
     }
     this.w = w
     this.h = h
+    // Proportional scaling can squeeze resting pixels towards an edge; pull them back on screen.
+    const m = C.SPAWN_MARGIN
+    const clampX = (x: number) => (w > 2 * m ? Math.max(m, Math.min(w - m, x)) : w / 2)
+    const clampY = (y: number) => (h > 2 * m ? Math.max(m, Math.min(h - m, y)) : h / 2)
+    for (const o of [...this.respawns, ...this.pixels.filter((p) => p.vy === 0)]) {
+      o.x = clampX(o.x)
+      o.y = clampY(o.y)
+    }
+  }
+
+  /** HUD overlay regions changed: record them and move anything resting underneath. */
+  setExclusions(rects: Rect[]): void {
+    this.exclusions = rects
+    for (const r of this.respawns) if (this.underHud(r.x, r.y)) Object.assign(r, this.findSpawnPos())
+    for (const p of this.pixels) {
+      if (!p.dead && p.vy === 0 && this.underHud(p.x, p.y)) Object.assign(p, this.findSpawnPos())
+    }
   }
 
   drainEvents(): GameEvent[] {
@@ -243,22 +290,40 @@ export class Game {
       if (d <= this.hitRadius || d <= reach) hits.push({ p, d })
     }
     if (blastR > 0) this.emit({ type: 'blast', x, y, r: blastR, cause: 'click' })
-    if (hits.length === 0) {
+    const boss = this.fightingBoss()
+    const bossHit = boss !== null && Math.abs(boss.x - x) <= boss.r + this.hitRadius && Math.abs(boss.y - y) <= boss.r + this.hitRadius
+    if (hits.length === 0 && !bossHit) {
       this.emit({ type: 'miss', x, y })
       return
     }
+    if (bossHit) {
+      this.bumpCombo()
+      this.hitBoss('click', x, y)
+    }
+    if (hits.length === 0) return
     hits.sort((a, b) => a.d - b.d)
     const group = this.newGroup('click')
-    const comboOn = this.stats.comboCap > 0
     for (const { p } of hits) {
-      if (comboOn) {
-        this.combo.count++
-        this.combo.timer = C.COMBO_WINDOW
-        if (this.combo.count > st.maxCombo) st.maxCombo = this.combo.count
-      }
+      this.bumpCombo()
       st.manualKills++
       this.destroy(p, 'click', group)
     }
+  }
+
+  /** Bring the boss up now. Normally driven by `state.bossTimer`; public for tests and the dev console. */
+  spawnBoss(): Boss {
+    const tier = this.state.stats.bossKills + 1
+    const maxHp = bossMaxHp(tier)
+    const hp = Math.max(1, Math.round(maxHp * this.state.bossHealth))
+    const r = C.BOSS_RADIUS
+    const pos = this.findBossPos(r)
+    const a = this.rng.range(0, Math.PI * 2)
+    this.boss = { x: pos.x, y: pos.y, vx: Math.cos(a), vy: Math.sin(a), r, hp, maxHp, tier, phase: 'rise', t: 0, timeLeft: C.BOSS_FIGHT_TIME, eatTimer: C.BOSS_EAT_INTERVAL, enraged: hp <= maxHp * C.BOSS_ENRAGE_AT, nuked: false }
+    // Held at 0 while the boss is up, so reloading mid-fight brings it straight back.
+    this.state.bossTimer = 0
+    this.emit({ type: 'boss-rise', x: pos.x, y: pos.y, tier })
+    this.revision++
+    return this.boss
   }
 
   tick(dt: number): void {
@@ -276,6 +341,7 @@ export class Game {
     this.updateLasers(dt)
     this.updateRain(dt)
     this.updateRainbow(dt)
+    this.updateBoss(dt)
     if (this.frenzy > 0) this.frenzy = Math.max(0, this.frenzy - dt)
 
     // Compact dead entities once per tick.
@@ -445,6 +511,13 @@ export class Game {
     return id
   }
 
+  private bumpCombo(): void {
+    if (this.stats.comboCap <= 0) return
+    this.combo.count++
+    this.combo.timer = C.COMBO_WINDOW
+    if (this.combo.count > this.state.stats.maxCombo) this.state.stats.maxCombo = this.combo.count
+  }
+
   private emit(e: GameEvent): void {
     this.events.push(e)
     if (this.events.length > MAX_EVENTS) this.events.splice(0, this.events.length - MAX_EVENTS)
@@ -494,7 +567,9 @@ export class Game {
     for (let i = 0; i < 24; i++) {
       const x = this.rng.range(m, Math.max(m + 1, this.w - m))
       const y = this.rng.range(m, Math.max(m + 1, this.h - m))
-      if (this.exclusions.some((r) => x > r.x - 3 && x < r.x + r.w + 3 && y > r.y - 3 && y < r.y + r.h + 3)) continue
+      if (this.underHud(x, y)) continue
+      const b = this.boss
+      if (b && Math.abs(x - b.x) < b.r + 4 && Math.abs(y - b.y) < b.r + 4) continue
       let nearest = Infinity
       for (const p of this.pixels) if (!p.dead) nearest = Math.min(nearest, Math.hypot(p.x - x, p.y - y))
       for (const r of this.respawns) nearest = Math.min(nearest, Math.hypot(r.x - x, r.y - y))
@@ -505,6 +580,12 @@ export class Game {
       }
     }
     return best
+  }
+
+  /** True if a pixel centred here would be drawn (even partly) beneath a HUD overlay. */
+  private underHud(x: number, y: number): boolean {
+    const pad = C.PIXEL_SIZE
+    return this.exclusions.some((r) => x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad)
   }
 
   // ------------------------------------------------------------------- updates
@@ -530,6 +611,11 @@ export class Game {
       if (p.dead) continue
       this.destroy(p, 'nuke', group, this.stats.nukeYield)
       count++
+    }
+    const boss = this.fightingBoss()
+    if (boss && !boss.nuked) {
+      boss.nuked = true
+      this.damageBoss(boss.maxHp * C.BOSS_NUKE_FRACTION, false, 'nuke', boss.x, boss.y)
     }
     this.bombs = []
     this.lasers = []
@@ -607,12 +693,15 @@ export class Game {
     for (const p of this.pixels) if (!p.dead) byId.set(p.id, p)
     const claimed = new Set<number>()
     for (const d of this.drones) if (d.targetId !== null) claimed.add(d.targetId)
+    // The boss is a shared target: any number of drones can work on it at once.
+    const boss = this.fightingBoss()
 
     for (const d of this.drones) {
       d.phase += dt * 2
       if (d.cooldown > 0) d.cooldown -= dt
-      let target = d.targetId !== null ? byId.get(d.targetId) : undefined
-      if (!target || !droneCanTake(target)) {
+      let onBoss = boss !== null && d.targetId === BOSS_TARGET
+      let target = d.targetId !== null && !onBoss ? byId.get(d.targetId) : undefined
+      if (!onBoss && (!target || !droneCanTake(target))) {
         if (d.targetId !== null) claimed.delete(d.targetId)
         target = undefined
         d.targetId = null
@@ -625,14 +714,32 @@ export class Game {
             target = p
           }
         }
-        if (target) {
+        if (boss && Math.hypot(boss.x - d.x, boss.y - d.y) - boss.r < best) {
+          target = undefined
+          onBoss = true
+          d.targetId = BOSS_TARGET
+        } else if (target) {
           d.targetId = target.id
           claimed.add(target.id)
         }
       }
 
       const speed = s.droneSpeed
-      if (target) {
+      if (onBoss && boss) {
+        const dx = boss.x - d.x
+        const dy = boss.y - d.y
+        const dist = Math.hypot(dx, dy)
+        const step = speed * dt
+        if (dist > boss.r * 0.6) {
+          d.x += (dx / dist) * Math.min(step, dist)
+          d.y += (dy / dist) * Math.min(step, dist)
+        } else if (d.cooldown <= 0) {
+          this.emit({ type: 'drone-zap', x1: d.x, y1: d.y - 4, x2: d.x, y2: d.y })
+          this.hitBoss('drone', d.x, d.y)
+          d.cooldown = s.droneCooldown
+          d.targetId = null
+        }
+      } else if (target) {
         const dx = target.x - d.x
         const dy = target.y - d.y
         const dist = Math.hypot(dx, dy)
@@ -681,7 +788,7 @@ export class Game {
         live.push(b)
         continue
       }
-      this.blasts.push({ x: b.x, y: b.y, r: b.r, delay: 0, cause: 'bomb', group: b.group, depth: 0 })
+      this.blasts.push({ x: b.x, y: b.y, r: b.r, delay: 0, cause: 'bomb', group: b.group, depth: 0, mini: b.mini })
       if (!b.mini && this.stats.cluster) {
         for (let i = 0; i < 3; i++) {
           const a = this.rng.range(0, Math.PI * 2)
@@ -720,6 +827,16 @@ export class Game {
         y = c.y
       }
     }
+    // A fighting boss is worth a small crowd.
+    const boss = this.fightingBoss()
+    if (boss) {
+      let n = 4
+      for (const p of alive) if (Math.hypot(p.x - boss.x, p.y - boss.y) <= r) n++
+      if (n > best) {
+        x = boss.x
+        y = boss.y
+      }
+    }
     this.bombs.push({ id: this.nextId++, x, y, vx: 0, vy: 0, fuse: C.BOMB_FUSE, total: C.BOMB_FUSE, r, mini: false, group: this.newGroup('bomb') })
     this.emit({ type: 'bomb-drop', x, y })
   }
@@ -739,6 +856,9 @@ export class Game {
       const reach = b.r + C.PIXEL_SIZE / 2
       for (const p of this.pixels) {
         if (!p.dead && Math.hypot(p.x - b.x, p.y - b.y) <= reach) this.destroy(p, b.cause, b.group, 1, b.depth)
+      }
+      if ((b.cause === 'bomb' || b.cause === 'chain') && this.bossTouches(b.x, b.y, b.r)) {
+        this.hitBoss(b.cause === 'chain' ? 'chain' : b.mini ? 'bomblet' : 'bomb', b.x, b.y)
       }
     }
   }
@@ -771,7 +891,8 @@ export class Game {
 
   private createLaser(): void {
     const alive = this.pixels.filter((p) => !p.dead)
-    const anchor = alive.length ? alive[this.rng.int(0, alive.length - 1)] : { x: this.w / 2, y: this.h / 2 }
+    const boss = this.fightingBoss()
+    const anchor = boss && this.rng.chance(0.5) ? boss : alive.length ? alive[this.rng.int(0, alive.length - 1)] : { x: this.w / 2, y: this.h / 2 }
     // Mostly horizontal/diagonal sweeps read best on wide and tall screens alike.
     const a = this.rng.range(-0.6, 0.6) + (this.rng.chance(0.3) ? Math.PI / 2 : 0)
     const L = this.w + this.h
@@ -790,6 +911,10 @@ export class Game {
       if (p.dead) continue
       const dist = Math.abs((p.x - l.x1) * ly - (p.y - l.y1) * lx) / len
       if (dist <= reach) this.destroy(p, 'laser', l.group)
+    }
+    const boss = this.fightingBoss()
+    if (boss && Math.abs((boss.x - l.x1) * ly - (boss.y - l.y1) * lx) / len <= boss.r + C.LASER_WIDTH / 2) {
+      this.hitBoss('laser', boss.x, boss.y)
     }
   }
 
@@ -848,6 +973,194 @@ export class Game {
       this.rainbowTimer = this.stats.rainbowInterval
       const pos = this.findSpawnPos()
       this.spawnPixel(pos.x, pos.y, 'rainbow', false)
+    }
+  }
+
+  // ---------------------------------------------------------------------- boss
+
+  private fightingBoss(): Boss | null {
+    return this.boss && this.boss.phase === 'fight' ? this.boss : null
+  }
+
+  /** Does a circle touch the fighting boss's square body? */
+  private bossTouches(x: number, y: number, r: number): boolean {
+    const b = this.fightingBoss()
+    if (!b) return false
+    const dx = Math.max(0, Math.abs(x - b.x) - b.r)
+    const dy = Math.max(0, Math.abs(y - b.y) - b.r)
+    return Math.hypot(dx, dy) <= r
+  }
+
+  private findBossPos(r: number): { x: number; y: number } {
+    const m = r + 4
+    const clear = (x: number, y: number) => !this.exclusions.some((e) => x + r > e.x && x - r < e.x + e.w && y + r > e.y && y - r < e.y + e.h)
+    for (let i = 0; i < 24; i++) {
+      const x = this.rng.range(m, Math.max(m + 1, this.w - m))
+      const y = this.rng.range(m, Math.max(m + 1, this.h - m))
+      if (clear(x, y)) return { x, y }
+    }
+    return { x: this.w / 2, y: this.h / 2 }
+  }
+
+  /** One hit from a source. Machines do flat damage; taps can crit and ride the combo. */
+  private hitBoss(source: BossDamageSource, x: number, y: number): void {
+    if (!this.fightingBoss()) return
+    const s = this.stats
+    let dmg = C.BOSS_DAMAGE[source] * s.bossDamage
+    let crit = false
+    if (source === 'click') {
+      crit = s.critChance > 0 && this.rng.chance(s.critChance)
+      if (crit) dmg *= s.critMult
+      if (s.comboCap > 0) dmg *= comboMult(this.combo.count, s.comboCap)
+    }
+    this.damageBoss(dmg, crit, source, x, y)
+  }
+
+  private damageBoss(dmg: number, crit: boolean, source: BossDamageSource | 'nuke', x: number, y: number): void {
+    const b = this.fightingBoss()
+    if (!b) return
+    b.hp = Math.max(0, b.hp - dmg)
+    this.emit({ type: 'boss-hit', x, y, dmg, crit, source })
+    this.revision++
+    if (b.hp <= 0) {
+      this.defeatBoss(b)
+      return
+    }
+    if (!b.enraged && b.hp <= b.maxHp * C.BOSS_ENRAGE_AT) {
+      b.enraged = true
+      b.eatTimer = Math.min(b.eatTimer, C.BOSS_ENRAGED_EAT_INTERVAL)
+      this.emit({ type: 'boss-enrage', x: b.x, y: b.y })
+    }
+  }
+
+  private defeatBoss(b: Boss): void {
+    this.boss = null
+    const amount = this.stats.value * C.BOSS_REWARD_VALUE * b.tier
+    this.emit({ type: 'boss-defeat', x: b.x, y: b.y, tier: b.tier, amount })
+    this.earn(amount, true)
+    this.addXp(xpToNext(this.state.level) * C.BOSS_REWARD_XP_FRAC)
+    this.state.stats.bossKills++
+    this.state.bossTimer = C.BOSS_INTERVAL
+    this.state.bossHealth = 1
+    this.refreshStats()
+    // It bursts into golden loot. Drones leave golden pixels alone, so it is all yours.
+    const n = Math.min(C.BOSS_LOOT_MAX, C.BOSS_LOOT_BASE + C.BOSS_LOOT_PER_TIER * b.tier)
+    const m = C.SPAWN_MARGIN
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + this.rng.range(-0.3, 0.3)
+      const d = this.rng.range(b.r * 0.4, b.r + 18)
+      const x = Math.max(m, Math.min(this.w - m, b.x + Math.cos(a) * d))
+      const y = Math.max(m, Math.min(this.h - m, b.y + Math.sin(a) * d))
+      const pos = this.underHud(x, y) ? this.findSpawnPos() : { x, y }
+      this.spawnPixel(pos.x, pos.y, 'golden', false)
+    }
+    this.revision++
+  }
+
+  private escapeBoss(b: Boss): void {
+    b.phase = 'sink'
+    b.t = 0
+    this.state.stats.bossEscapes++
+    this.state.bossTimer = C.BOSS_INTERVAL
+    // It keeps its wounds, so a tough tier becomes a siege rather than a wall.
+    this.state.bossHealth = Math.min(1, b.hp / b.maxHp + C.BOSS_ESCAPE_RECOVER)
+    this.emit({ type: 'boss-escape', x: b.x, y: b.y })
+    this.revision++
+  }
+
+  private updateBoss(dt: number): void {
+    const b = this.boss
+    if (!b) {
+      if (!hasFeature(this.state.level, 'boss') || this.nuke) return
+      this.state.bossTimer = Math.max(0, this.state.bossTimer - dt)
+      if (this.state.bossTimer <= 0) this.spawnBoss()
+      return
+    }
+    if (b.phase === 'rise') {
+      b.t += dt
+      if (b.t >= C.BOSS_RISE) {
+        b.phase = 'fight'
+        b.t = 0
+        this.revision++
+      }
+      return
+    }
+    if (b.phase === 'sink') {
+      b.t += dt
+      if (b.t >= C.BOSS_SINK) {
+        this.boss = null
+        this.revision++
+      }
+      return
+    }
+
+    b.timeLeft -= dt
+    if (b.timeLeft <= 0) {
+      this.escapeBoss(b)
+      return
+    }
+
+    // Wander, but lean towards the nearest pixel it could swallow.
+    let prey: Pixel | null = null
+    let preyDist = Infinity
+    for (const p of this.pixels) {
+      if (p.dead || !droneCanTake(p)) continue
+      const d = Math.hypot(p.x - b.x, p.y - b.y)
+      if (d < preyDist) {
+        preyDist = d
+        prey = p
+      }
+    }
+    let turn = this.rng.range(-1, 1) * (b.enraged ? 3 : 1.2) * dt
+    if (prey) {
+      const want = Math.atan2(prey.y - b.y, prey.x - b.x)
+      let diff = want - Math.atan2(b.vy, b.vx)
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff))
+      turn += Math.max(-1, Math.min(1, diff)) * (b.enraged ? 2 : 0.8) * dt
+    }
+    const c = Math.cos(turn)
+    const sn = Math.sin(turn)
+    const vx = b.vx * c - b.vy * sn
+    const vy = b.vx * sn + b.vy * c
+    b.vx = vx
+    b.vy = vy
+    const speed = b.enraged ? C.BOSS_ENRAGED_SPEED : C.BOSS_SPEED
+    const px = b.x
+    const py = b.y
+    b.x += b.vx * speed * dt
+    b.y += b.vy * speed * dt
+    const m = b.r + 2
+    if (b.x < m || b.x > this.w - m) {
+      b.vx = -b.vx
+      b.x = Math.max(m, Math.min(this.w - m, b.x))
+    }
+    if (b.y < m || b.y > this.h - m) {
+      b.vy = -b.vy
+      b.y = Math.max(m, Math.min(this.h - m, b.y))
+    }
+    // Keep out from under the HUD: turn away from it, and never move further in.
+    const overlaps = (x: number, y: number) => this.exclusions.find((e) => x + b.r > e.x && x - b.r < e.x + e.w && y + b.r > e.y && y - b.r < e.y + e.h)
+    const hud = overlaps(b.x, b.y)
+    if (hud) {
+      const away = Math.atan2(b.y - (hud.y + hud.h / 2), b.x - (hud.x + hud.w / 2))
+      b.vx = Math.cos(away)
+      b.vy = Math.sin(away)
+      if (!overlaps(px, py)) {
+        b.x = px
+        b.y = py
+      }
+    }
+
+    b.eatTimer -= dt
+    if (b.eatTimer <= 0) {
+      b.eatTimer = b.enraged ? C.BOSS_ENRAGED_EAT_INTERVAL : C.BOSS_EAT_INTERVAL
+      if (prey && !prey.dead && Math.max(Math.abs(prey.x - b.x), Math.abs(prey.y - b.y)) <= b.r + C.BOSS_EAT_REACH) {
+        prey.dead = true
+        if (prey.slot) this.queueRespawn()
+        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * C.BOSS_EAT_HEAL)
+        this.emit({ type: 'boss-eat', x: prey.x, y: prey.y })
+        this.revision++
+      }
     }
   }
 }

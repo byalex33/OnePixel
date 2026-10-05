@@ -33,4 +33,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'rich', name: 'MILLIONAIRE', desc: 'Earn 1,000,000 pixels in total.', check: (s) => s.totalPixels >= 1e6 },
   { id: 'lvl10', name: 'DOUBLE DIGITS', desc: 'Reach level 10.', check: (s) => s.level >= 10 },
   { id: 'lvl15', name: 'VETERAN', desc: 'Reach level 15.', check: (s) => s.level >= 15 },
+  { id: 'lvl20', name: 'SIGNAL FOUND', desc: 'Reach level 20.', check: (s) => s.level >= 20 },
+  { id: 'boss', name: 'DEAD PIXEL', desc: 'Defeat the boss.', check: (s) => s.stats.bossKills >= 1 },
+  { id: 'boss5', name: 'BOSS RUSH', desc: 'Defeat 5 bosses.', check: (s) => s.stats.bossKills >= 5 },
 ]

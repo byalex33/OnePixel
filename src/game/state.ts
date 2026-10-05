@@ -1,6 +1,7 @@
 import type { LifetimeStats, SaveState, UpgradeLevels } from './types'
 import { UPGRADES } from './upgrades'
 import { rainInterval } from './formulas'
+import { BOSS_FIRST_DELAY } from './config'
 
 export function emptyUpgrades(): UpgradeLevels {
   return Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as UpgradeLevels
@@ -28,6 +29,8 @@ export function emptyStats(): LifetimeStats {
     bestStorm: 0,
     mostOnScreen: 0,
     playTime: 0,
+    bossKills: 0,
+    bossEscapes: 0,
   }
 }
 
@@ -43,6 +46,8 @@ export function createInitialState(): SaveState {
     nukeCharge: 0,
     // First storm arrives a little sooner than the regular interval.
     rainTimer: rainInterval(0) * 0.4,
+    bossTimer: BOSS_FIRST_DELAY,
+    bossHealth: 1,
     seenUpgrades: [],
     reveal: { hud: false, panel: false },
     settings: { sound: true, music: true, shake: true, haptics: true },

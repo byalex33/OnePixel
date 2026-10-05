@@ -191,6 +191,21 @@ export class Runtime {
           this.buzz([80, 40, 160])
           urgent = true
           break
+        case 'boss-rise':
+          this.buzz([60, 40, 60, 40, 120])
+          urgent = true
+          break
+        case 'boss-defeat':
+          this.buzz([40, 30, 40, 30, 200])
+          urgent = true
+          break
+        case 'boss-enrage':
+          this.buzz([30, 20, 30])
+          urgent = true
+          break
+        case 'boss-escape':
+          urgent = true
+          break
         case 'blast':
           if (e.cause === 'bomb') this.buzz(25)
           break
@@ -261,7 +276,7 @@ export class Runtime {
   }
 
   setExclusions(rects: Rect[]): void {
-    this.game.exclusions = rects
+    this.game.setExclusions(rects)
   }
 
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
@@ -323,14 +338,15 @@ export class Runtime {
   private replaceGame(game: Game): void {
     const exclusions = this.game.exclusions
     this.game = game
-    this.game.exclusions = exclusions
     this.notices = []
     this.renderer?.setGame(game)
+    // After setGame so the new world has its real size before anything is moved.
+    this.game.setExclusions(exclusions)
     this.applySettings()
     this.bump()
   }
 }
 
 function isSaveWorthy(e: GameEvent): boolean {
-  return e.type === 'levelup' || e.type === 'nuke'
+  return e.type === 'levelup' || e.type === 'nuke' || e.type === 'boss-defeat' || e.type === 'boss-escape'
 }

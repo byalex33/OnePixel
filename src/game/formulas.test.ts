@@ -43,6 +43,14 @@ describe('stat curves', () => {
     expect(F.nukeKills(0)).toBe(Infinity)
   })
 
+  it('boss curves: HP grows by tier, kills pay a lasting bonus, armor piercing starts at x1', () => {
+    for (let t = 1; t < 30; t++) expect(F.bossMaxHp(t + 1)).toBeGreaterThan(F.bossMaxHp(t))
+    expect(F.bossBonus(0)).toBe(1)
+    expect(F.bossBonus(3)).toBeGreaterThan(F.bossBonus(2))
+    expect(F.pierceMult(0)).toBe(1)
+    expect(F.pierceMult(5)).toBeGreaterThan(F.pierceMult(4))
+  })
+
   it('crit chance is capped', () => {
     expect(F.critChance(1)).toBeCloseTo(0.05)
     expect(F.critChance(1000)).toBe(0.5)
