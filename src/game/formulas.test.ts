@@ -66,6 +66,13 @@ describe('stat curves', () => {
     expect(F.xpToNext(1)).toBe(10)
     for (let l = 1; l < 30; l++) expect(F.xpToNext(l + 1)).toBeGreaterThan(F.xpToNext(l))
   })
+
+  it('xp per kill only gets the late-game bonus past level 11', () => {
+    expect(F.lateXpBonus(1)).toBe(1)
+    expect(F.lateXpBonus(11)).toBe(1)
+    expect(F.lateXpBonus(20)).toBeCloseTo(2.35)
+    expect(F.xpMult(20)).toBe(6)
+  })
 })
 
 describe('computeStats', () => {

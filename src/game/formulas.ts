@@ -14,7 +14,9 @@ const n = (l: number) => Math.max(0, l - 1)
 
 export const respawnTime = (l: number) => Math.max(0.3, 2.0 * Math.pow(0.85, l))
 export const valueMult = (l: number) => (1 + l) * Math.pow(1.05, l)
-export const xpMult = (l: number) => 1 + 0.15 * l
+export const xpMult = (l: number) => 1 + 0.25 * l
+/** Extra XP for every level past 11, so new unlocks keep pace with money in the late game. */
+export const lateXpBonus = (level: number) => 1 + 0.15 * Math.max(0, level - 11)
 export const critChance = (l: number) => (l <= 0 ? 0 : Math.min(0.5, 0.05 + 0.035 * n(l)))
 export const critMult = (l: number) => 3 + 0.5 * l
 export const comboCap = (l: number) => (l <= 0 ? 0 : 10 + 5 * n(l))
@@ -100,7 +102,7 @@ export function computeStats(s: SaveState): Stats {
     respawnTime: respawnTime(u.respawn),
     maxPixels: 1 + (has('multi', 'second') ? u.multi : 0),
     value: valueMult(u.value) * levelBonus(s.level) * achievementBonus(s.achievements.length) * bossBonus(s.stats.bossKills),
-    xpPerKill: xpMult(u.xp),
+    xpPerKill: xpMult(u.xp) * lateXpBonus(s.level),
     critChance: has('critChance', 'crit') ? critChance(u.critChance) : 0,
     critMult: critMult(u.critPower),
     comboCap: has('combo', 'combo') ? comboCap(u.combo) : 0,
