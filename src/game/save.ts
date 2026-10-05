@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS } from './achievements'
-import { SAVE_KEY, SAVE_VERSION } from './config'
+import { BOSS_INTERVAL, SAVE_KEY, SAVE_VERSION } from './config'
 import { createInitialState } from './state'
 import type { SaveState, UpgradeId } from './types'
 import { UPGRADE_MAP } from './upgrades'
@@ -47,6 +47,8 @@ export function sanitizeState(raw: unknown): SaveState {
   out.level = Math.floor(num(raw.level, 1, 1, 999))
   out.nukeCharge = num(raw.nukeCharge, 0)
   out.rainTimer = num(raw.rainTimer, base.rainTimer, 0, 3600)
+  out.bossTimer = num(raw.bossTimer, base.bossTimer, 0, BOSS_INTERVAL)
+  out.bossHealth = num(raw.bossHealth, 1, 0.05, 1)
 
   if (isObj(raw.upgrades)) {
     for (const id of Object.keys(out.upgrades) as UpgradeId[]) {

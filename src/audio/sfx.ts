@@ -23,12 +23,17 @@ export type Cue =
   | 'denied'
   | 'rain'
   | 'rainbow'
+  | 'boss-rise'
+  | 'boss-hit'
+  | 'boss-eat'
+  | 'boss-defeat'
+  | 'boss-escape'
 
 interface CueOpts {
   pitch?: number
 }
 
-const MIN_GAP: Partial<Record<Cue, number>> = { pop: 0.025, 'pop-auto': 0.06, chain: 0.05, miss: 0.08 }
+const MIN_GAP: Partial<Record<Cue, number>> = { pop: 0.025, 'pop-auto': 0.06, chain: 0.05, miss: 0.08, 'boss-hit': 0.05 }
 
 export class Sfx {
   enabled = true
@@ -133,6 +138,24 @@ export class Sfx {
       case 'rainbow':
         ;[523, 659, 784, 988, 1175, 1319, 1568, 2093].forEach((f, i) => this.tone('square', f, f * 1.02, 0.08, 0.28, i * 0.04))
         break
+      case 'boss-rise':
+        this.noise(1.6, 0.8, 400)
+        this.tone('sine', 70, 35, 1.5, 1)
+        for (let i = 0; i < 3; i++) this.tone('square', 220, 180, 0.18, 0.25, 0.3 + i * 0.3)
+        break
+      case 'boss-hit':
+        this.tone('square', 140 * p, 70 * p, 0.07, 0.45)
+        break
+      case 'boss-eat':
+        this.tone('sawtooth', 300, 60, 0.18, 0.35)
+        break
+      case 'boss-defeat':
+        this.noise(1.2, 1, 1200)
+        ;[392, 523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone('square', f, f, 0.12, 0.4, 0.15 + i * 0.07))
+        break
+      case 'boss-escape':
+        ;[392, 330, 262, 196].forEach((f, i) => this.tone('triangle', f, f * 0.98, 0.16, 0.35, i * 0.12))
+        break
     }
   }
 
@@ -202,6 +225,18 @@ export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
       return { cue: 'rain' }
     case 'rainbow-start':
       return { cue: 'rainbow' }
+    case 'boss-rise':
+      return { cue: 'boss-rise' }
+    case 'boss-hit':
+      if (e.source === 'click') return { cue: e.crit ? 'crit' : 'boss-hit', opts: { pitch: 0.9 + Math.random() * 0.25 } }
+      if (e.source === 'nuke') return null
+      return { cue: 'boss-hit', opts: { pitch: 0.7 } }
+    case 'boss-eat':
+      return { cue: 'boss-eat' }
+    case 'boss-defeat':
+      return { cue: 'boss-defeat' }
+    case 'boss-escape':
+      return { cue: 'boss-escape' }
     default:
       return null
   }

@@ -39,6 +39,12 @@ export const levelBonus = (level: number) => 1 + 0.05 * (level - 1)
 export const achievementBonus = (n: number) => 1 + 0.02 * n
 export const comboMult = (count: number, cap: number) => 1 + COMBO_STEP * Math.min(count, cap)
 export const OVERCLOCK = 0.8
+/** Boss HP by tier (tier 1 is the first boss). */
+export const bossMaxHp = (tier: number) => Math.round(25000 * Math.pow(1.25, Math.max(0, tier - 1)))
+/** Every boss defeated permanently adds +5% pixel value. */
+export const bossBonus = (kills: number) => 1 + 0.05 * kills
+/** Armor piercing: boss damage multiplier. */
+export const pierceMult = (l: number) => 1 + 0.25 * l
 
 /** XP needed to go from `level` to `level + 1`. */
 export const xpToNext = (level: number) => Math.round(10 * Math.pow(2.0, level - 1))
@@ -78,6 +84,8 @@ export interface Stats {
   nukeEnabled: boolean
   nukeKills: number
   nukeYield: number
+  /** Multiplier on every hit against the boss. */
+  bossDamage: number
 }
 
 export function computeStats(s: SaveState): Stats {
@@ -88,7 +96,7 @@ export function computeStats(s: SaveState): Stats {
   return {
     respawnTime: respawnTime(u.respawn),
     maxPixels: 1 + (has('multi', 'second') ? u.multi : 0),
-    value: valueMult(u.value) * levelBonus(s.level) * achievementBonus(s.achievements.length),
+    value: valueMult(u.value) * levelBonus(s.level) * achievementBonus(s.achievements.length) * bossBonus(s.stats.bossKills),
     xpPerKill: xpMult(u.xp),
     critChance: has('critChance', 'crit') ? critChance(u.critChance) : 0,
     critMult: critMult(u.critPower),
@@ -114,5 +122,6 @@ export function computeStats(s: SaveState): Stats {
     nukeEnabled: has('nukeCharge', 'nuke'),
     nukeKills: has('nukeCharge', 'nuke') ? nukeKills(u.nukeCharge) : Infinity,
     nukeYield: nukeYield(u.nukeYield),
+    bossDamage: has('pierce', 'boss') ? pierceMult(u.pierce) : 1,
   }
 }

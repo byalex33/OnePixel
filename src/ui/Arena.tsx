@@ -4,7 +4,7 @@ import { REPO_URL } from '../app/links'
 import type { Rect } from '../game/game'
 import { useRuntime } from './hooks'
 import { ClickMeHint } from './ClickMeHint'
-import { BalanceBox, ComboMeter, NukeControl, StormStatus } from './Hud'
+import { BalanceBox, BossBar, ComboMeter, NukeControl, StormStatus } from './Hud'
 import { LevelUpOverlay, OfflineModal, Toasts } from './Notices'
 
 export function Arena() {
@@ -14,10 +14,12 @@ export function Arena() {
   const balanceRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const starRef = useRef<HTMLAnchorElement>(null)
+  const bossRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<() => void>(() => {})
   const hud = rt.game.state.reveal.hud
   const level = rt.game.state.level
   const { nukeEnabled, rainEnabled } = rt.game.stats
+  const bossUp = rt.game.boss !== null
 
   useEffect(() => {
     const wrap = wrapRef.current
@@ -29,7 +31,7 @@ export function Arena() {
       const box = wrap.getBoundingClientRect()
       // Keep pixels from spawning underneath HUD overlays.
       const rects: Rect[] = []
-      for (const el of [balanceRef.current, bottomRef.current, starRef.current]) {
+      for (const el of [balanceRef.current, bottomRef.current, starRef.current, bossRef.current]) {
         if (!el) continue
         const r = el.getBoundingClientRect()
         if (r.width === 0) continue
@@ -56,10 +58,13 @@ export function Arena() {
     }
   }, [rt])
 
-  // HUD overlays appear as the player progresses; re-measure spawn exclusions.
+  // HUD overlays appear and change size as the player progresses; re-measure spawn exclusions.
   useEffect(() => {
     measureRef.current()
-  }, [hud, level, nukeEnabled, rainEnabled])
+    const ro = new ResizeObserver(() => measureRef.current())
+    for (const el of [balanceRef.current, bottomRef.current, starRef.current, bossRef.current]) if (el) ro.observe(el)
+    return () => ro.disconnect()
+  }, [hud, level, nukeEnabled, rainEnabled, bossUp])
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault()
@@ -80,6 +85,7 @@ export function Arena() {
       </div>
       <ClickMeHint />
       <ComboMeter />
+      <BossBar ref={bossRef} />
       <BalanceBox ref={balanceRef} />
       <div ref={bottomRef} className="pointer-events-none absolute bottom-3 left-3 flex flex-col items-start gap-3">
         <StormStatus />

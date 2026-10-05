@@ -56,3 +56,35 @@ export const OFFLINE_EFFICIENCY = 0.5
 export const SAVE_KEY = 'onepixel.save'
 export const SAVE_VERSION = 1
 export const AUTOSAVE_SECONDS = 15
+
+/** The boss: a giant stuck pixel that surfaces from beneath the grid at level 20. */
+export const BOSS_NAME = 'DEAD PIXEL'
+/** Half the width of its square body, in world units. */
+export const BOSS_RADIUS = 13
+export const BOSS_RISE = 1.6
+export const BOSS_SINK = 1.2
+/** Seconds the player has to finish it before it burrows back down. */
+export const BOSS_FIGHT_TIME = 60
+export const BOSS_INTERVAL = 180
+export const BOSS_FIRST_DELAY = 6
+export const BOSS_SPEED = 9
+export const BOSS_ENRAGED_SPEED = 17
+export const BOSS_ENRAGE_AT = 0.5
+export const BOSS_EAT_INTERVAL = 2.5
+export const BOSS_ENRAGED_EAT_INTERVAL = 1.5
+/** How far beyond its body it can reach to swallow a pixel. */
+export const BOSS_EAT_REACH = 12
+/** Fraction of max HP healed per pixel swallowed. */
+export const BOSS_EAT_HEAL = 0.02
+/** An escaped boss comes back with the damage it took, minus this much recovery. */
+export const BOSS_ESCAPE_RECOVER = 0.15
+/** Damage per hit by source, before armor piercing (and, for taps, crits and combos). */
+export const BOSS_DAMAGE = { click: 10, drone: 1, chain: 4, bomblet: 12, bomb: 35, laser: 25 } as const
+/** A nuke takes this fraction of max HP, once per fight (late-game nukes recharge in seconds). */
+export const BOSS_NUKE_FRACTION = 0.2
+/** Defeat pays this many pixel values per tier, plus a slice of the XP bar. */
+export const BOSS_REWARD_VALUE = 150
+export const BOSS_REWARD_XP_FRAC = 0.1
+export const BOSS_LOOT_BASE = 12
+export const BOSS_LOOT_PER_TIER = 2
+export const BOSS_LOOT_MAX = 30

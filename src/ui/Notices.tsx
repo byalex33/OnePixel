@@ -31,7 +31,7 @@ export function LevelUpOverlay() {
         </div>
         {def && (
           <div className="frame px-shadow mx-auto mt-5 max-w-[320px] p-3 pt-4 text-left">
-            <span className="frame-title text-gold!">{def.feature === 'signal' ? 'TRANSMISSION' : 'NEW IN SHOP'}</span>
+            <span className="frame-title text-gold!">{def.feature === 'boss' ? 'TRANSMISSION' : 'NEW IN SHOP'}</span>
             <div className="font-pixel text-[10px] leading-relaxed text-gold md:text-[11px]">{def.title}</div>
             <div className="mt-1 text-[19px] leading-tight text-ink">{def.desc}</div>
           </div>

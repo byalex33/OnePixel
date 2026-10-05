@@ -3,7 +3,7 @@ import { fmt } from '../game/format'
 import type { Game } from '../game/game'
 import type { GameEvent } from '../game/types'
 import { buildField, paintField, sceneryStage, type DotField } from './dotfield'
-import { C_BLUE, C_CYAN, C_DARK, C_GOLD, C_LIGHT, C_MID, C_ORANGE, C_RAINBOW, C_RED, C_WHITE, PAL, rainbowHue } from './palette'
+import { C_BLUE, C_CYAN, C_DARK, C_GOLD, C_LIGHT, C_MID, C_ORANGE, C_PINK, C_RAINBOW, C_RED, C_VIOLET, C_WHITE, PAL, rainbowHue } from './palette'
 import { Particles } from './particles'
 import { BOMB, CURSOR, drawSprite } from './sprites'
 
@@ -39,6 +39,22 @@ interface Zap {
 const FONT = '"Press Start 2P", ui-monospace, monospace'
 const MAX_TEXTS = 40
 
+/** The boss is drawn as a BOSS_CELLS x BOSS_CELLS block that cracks apart as it takes damage. */
+const BOSS_CELLS = 7
+const BOSS_EYES = new Set([2 * BOSS_CELLS + 2, 2 * BOSS_CELLS + 4])
+const BOSS_MOUTH = new Set([4 * BOSS_CELLS + 2, 4 * BOSS_CELLS + 3, 4 * BOSS_CELLS + 4])
+/** The order cells crack in: a fixed shuffle, so damage reads the same every fight. */
+const BOSS_CRACK_ORDER = (() => {
+  const order = [...Array(BOSS_CELLS * BOSS_CELLS).keys()].filter((i) => !BOSS_EYES.has(i) && !BOSS_MOUTH.has(i))
+  let seed = 7
+  for (let i = order.length - 1; i > 0; i--) {
+    seed = (seed * 16807) % 2147483647
+    const j = seed % (i + 1)
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  return order
+})()
+
 const easeOutBack = (t: number) => {
   const c1 = 1.9
   const c3 = c1 + 1
@@ -72,6 +88,9 @@ export class Renderer {
   private flash: { t: number; dur: number; color: string; alpha: number } = { t: 1, dur: 1, color: PAL.white, alpha: 0 }
   private trauma = 0
   private freeze = 0
+  /** When the boss was last hit and last ate, for its flash and its mouth. */
+  private bossHitAt = -1
+  private bossAteAt = -1
   private time = 0
   private lowFx: boolean
   private canvas: HTMLCanvasElement
@@ -153,6 +172,7 @@ export class Renderer {
     let sx = 0
     let sy = 0
     let n = 0
+    let bossDmg = 0
 
     for (const e of events) {
       switch (e.type) {
@@ -205,7 +225,47 @@ export class Renderer {
         case 'levelup':
           this.levelFx()
           break
+        case 'boss-rise':
+          this.bossRiseFx(e.x * this.scale, e.y * this.scale)
+          break
+        case 'boss-hit':
+          this.bossHitAt = this.time
+          if (e.source === 'click' || e.source === 'nuke') this.bossHitFx(e)
+          else {
+            bossDmg += e.dmg
+            this.particles.burst(e.x * this.scale, e.y * this.scale, 2, 90 * this.k, 0.3, 2, [C_RED, C_WHITE])
+          }
+          break
+        case 'boss-enrage': {
+          const x = e.x * this.scale
+          const y = e.y * this.scale
+          this.ring(x, y, this.ps * 6, 0.6, PAL.red, true, false)
+          this.setFlash(PAL.red, 0.18, 0.3)
+          this.addTrauma(0.4)
+          this.text(x, y - this.ps * 3, 'ENRAGED!', PAL.red, 12, 1.2)
+          break
+        }
+        case 'boss-eat':
+          this.bossAteAt = this.time
+          this.particles.burst(e.x * this.scale, e.y * this.scale, 8, 60 * this.k, 0.35, 2, [C_WHITE, C_MID, C_RED])
+          break
+        case 'boss-defeat':
+          this.bossDefeatFx(e.x * this.scale, e.y * this.scale, e.amount)
+          break
+        case 'boss-escape': {
+          const x = e.x * this.scale
+          const y = e.y * this.scale
+          this.ring(x, y, this.ps * 5, 0.8, PAL.mid, true, true)
+          this.text(this.cssW / 2, this.cssH / 2, 'IT GOT AWAY', PAL.light, 16, 2)
+          this.text(this.cssW / 2, this.cssH / 2 + 24, 'BUT IT IS WOUNDED', PAL.mid, 9, 2)
+          break
+        }
       }
+    }
+    const boss = this.game.boss
+    if (bossDmg > 0 && boss) {
+      const bx = boss.x * this.scale + (Math.random() - 0.5) * boss.r * this.scale
+      this.text(bx, (boss.y - boss.r) * this.scale - this.ps * 0.6, `-${fmt(bossDmg)}`, PAL.light, 8, 0.6)
     }
     if (many && n > 0) {
       this.text(sx / n * this.scale, (sy / n) * this.scale - this.ps, `+${fmt(sum)}`, PAL.white, 10, 0.9)
@@ -344,6 +404,55 @@ export class Renderer {
     }
   }
 
+  private bossRiseFx(x: number, y: number): void {
+    this.addTrauma(0.6)
+    this.setFlash(PAL.red, 0.2, 0.5)
+    this.ring(x, y, Math.hypot(this.cssW, this.cssH) * 0.5, 1.4, PAL.red, true, false)
+    this.ring(x, y, this.ps * 5, 0.8, PAL.white, true, true)
+    this.particles.burst(x, y, this.lowFx ? 30 : 70, 260 * this.k, 1, Math.max(3, Math.round(this.ps * 0.3)), [C_DARK, C_MID, C_RED, C_RED], 300 * this.k)
+    this.text(this.cssW / 2, this.cssH / 2 - 14, '!! WARNING !!', PAL.red, this.cssW < 500 ? 14 : 20, 1.8)
+    this.text(this.cssW / 2, this.cssH / 2 + 14, `${C.BOSS_NAME} HAS SURFACED`, PAL.white, 9, 1.8)
+  }
+
+  private bossHitFx(e: Extract<GameEvent, { type: 'boss-hit' }>): void {
+    const x = e.x * this.scale
+    const y = e.y * this.scale
+    const size = Math.max(2, Math.round(this.ps * 0.24))
+    if (e.source === 'nuke') {
+      this.text(x, y - this.ps * 2, `-${fmt(e.dmg)}`, PAL.orange, 16, 1.4)
+      return
+    }
+    this.particles.burst(x, y, this.lowFx ? 6 : 12, 220 * this.k, 0.5, size, e.crit ? [C_RED, C_GOLD, C_WHITE] : [C_RED, C_PINK, C_WHITE], 380 * this.k)
+    this.ring(x, y, this.ps * (e.crit ? 2.6 : 1.6), 0.18, e.crit ? PAL.red : PAL.white, false, false)
+    this.addTrauma(e.crit ? 0.16 : 0.07)
+    if (e.crit) {
+      this.freeze = Math.max(this.freeze, 0.035)
+      this.text(x, y - this.ps * 1.4, `-${fmt(e.dmg)}`, PAL.red, 13, 0.8)
+    } else {
+      this.text(x, y - this.ps * 0.8, `-${fmt(e.dmg)}`, PAL.white, 9, 0.7)
+    }
+  }
+
+  private bossDefeatFx(x: number, y: number, amount: number): void {
+    this.setFlash(PAL.white, 0.7, 0.9)
+    this.addTrauma(0.9)
+    this.freeze = Math.max(this.freeze, 0.12)
+    this.ring(x, y, Math.hypot(this.cssW, this.cssH) * 0.8, 1.3, PAL.white, true, false)
+    this.ring(x, y, Math.hypot(this.cssW, this.cssH) * 0.45, 1, PAL.red, true, false)
+    const half = C.BOSS_RADIUS * this.scale
+    const n = this.lowFx ? 120 : 300
+    for (let i = 0; i < n; i++) {
+      const px = x + (Math.random() - 0.5) * half * 2
+      const py = y + (Math.random() - 0.5) * half * 2
+      const a = Math.atan2(py - y, px - x)
+      const v = (120 + Math.random() * 420) * this.k
+      const c = [C_RED, C_PINK, C_WHITE, C_GOLD, C_VIOLET][i % 5]
+      this.particles.add(px, py, Math.cos(a) * v, Math.sin(a) * v, 0.7 + Math.random(), 2 + Math.random() * 5, c, 260)
+    }
+    this.text(x, y - 18, 'BOSS DOWN', PAL.red, 20, 2.2)
+    this.text(x, y + 14, `+${fmt(amount)}`, PAL.gold, 16, 2.2)
+  }
+
   private ring(x: number, y: number, max: number, dur: number, color: string, grid: boolean, dotted: boolean): void {
     if (this.rings.length > 60) this.rings.shift()
     this.rings.push({ x, y, max, t: 0, dur, color, grid, dotted })
@@ -407,6 +516,7 @@ export class Renderer {
     this.drawRespawns()
     this.drawBombs()
     this.drawPixels(dt)
+    this.drawBoss()
     this.drawLasers()
     this.drawDrones()
     this.drawZaps()
@@ -562,6 +672,81 @@ export class Renderer {
         ctx.globalAlpha = 1
       }
     }
+    ctx.globalAlpha = 1
+  }
+
+  /** A giant stuck pixel: a block of cells that crack away as its HP falls. */
+  private drawBoss(): void {
+    const b = this.game.boss
+    if (!b) return
+    const ctx = this.ctx
+    const s = this.scale
+    const size = Math.round(b.r * 2 * s)
+    const cell = size / BOSS_CELLS
+    let x = Math.round(b.x * s - size / 2)
+    let y = Math.round(b.y * s - size / 2)
+    // Rising out of (or sinking back into) the grid: slide through the floor line at its bottom edge.
+    const shown = b.phase === 'rise' ? b.t / C.BOSS_RISE : b.phase === 'sink' ? 1 - b.t / C.BOSS_SINK : 1
+    const floor = y + size
+    y += Math.round(size * (1 - Math.min(1, Math.max(0, shown))))
+    if (b.enraged && b.phase === 'fight' && !this.reducedMotion) {
+      x += Math.round((Math.random() - 0.5) * 3)
+      y += Math.round((Math.random() - 0.5) * 3)
+    }
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(x - size, floor - size * 3, size * 3, size * 3)
+    ctx.clip()
+
+    // Glow.
+    const pulse = 0.12 + 0.05 * Math.sin(this.time * (b.enraged ? 12 : 4))
+    const glow = Math.round(size * 1.6)
+    ctx.globalAlpha = pulse
+    ctx.fillStyle = PAL.red
+    ctx.fillRect(Math.round(x + size / 2 - glow / 2), Math.round(y + size / 2 - glow / 2), glow, glow)
+
+    const cracked = Math.floor((1 - b.hp / b.maxHp) * BOSS_CRACK_ORDER.length * 0.85)
+    const dead = new Set(BOSS_CRACK_ORDER.slice(0, cracked))
+    const mouthOpen = this.time - this.bossAteAt < 0.25
+    const hit = Math.max(0, 1 - (this.time - this.bossHitAt) / 0.08)
+    const gap = cell >= 6 ? 1 : 0
+    const drawCells = (ox: number, oy: number, color: string, alpha: number) => {
+      ctx.globalAlpha = alpha
+      ctx.fillStyle = color
+      for (let i = 0; i < BOSS_CELLS * BOSS_CELLS; i++) {
+        if (dead.has(i) || BOSS_EYES.has(i) || (mouthOpen && BOSS_MOUTH.has(i))) continue
+        const cx = Math.round(x + ox + (i % BOSS_CELLS) * cell)
+        const cy = Math.round(y + oy + Math.floor(i / BOSS_CELLS) * cell)
+        ctx.fillRect(cx, cy, Math.ceil(cell) - gap, Math.ceil(cell) - gap)
+      }
+    }
+    if (b.enraged) {
+      // RGB split: the signal is breaking up.
+      const o = this.reducedMotion ? 2 : 2 + Math.round(Math.random() * 2)
+      drawCells(-o, 0, PAL.red, 0.5)
+      drawCells(o, 0, PAL.cyan, 0.35)
+    }
+    drawCells(0, 0, b.enraged && Math.floor(this.time * 10) % 2 === 0 ? PAL.pink : PAL.red, 1)
+    // Cracked cells leave a dim outline behind.
+    ctx.globalAlpha = 0.5
+    ctx.fillStyle = PAL.dark
+    for (const i of dead) {
+      const cx = Math.round(x + (i % BOSS_CELLS) * cell)
+      const cy = Math.round(y + Math.floor(i / BOSS_CELLS) * cell)
+      ctx.fillRect(cx, cy, Math.ceil(cell) - gap, 1)
+      ctx.fillRect(cx, cy, 1, Math.ceil(cell) - gap)
+    }
+    // Eyes.
+    ctx.globalAlpha = 1
+    ctx.fillStyle = b.enraged ? PAL.gold : PAL.white
+    for (const i of BOSS_EYES) {
+      const cx = Math.round(x + (i % BOSS_CELLS) * cell + cell * 0.25)
+      const cy = Math.round(y + Math.floor(i / BOSS_CELLS) * cell + cell * 0.25)
+      ctx.fillRect(cx, cy, Math.max(2, Math.round(cell * 0.5)), Math.max(2, Math.round(cell * 0.5)))
+    }
+    if (hit > 0) drawCells(0, 0, PAL.white, hit * 0.8)
+    ctx.restore()
     ctx.globalAlpha = 1
   }
 

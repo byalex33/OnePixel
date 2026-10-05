@@ -30,7 +30,7 @@ export const LEVELS: LevelDef[] = [
   { level: 16, feature: 'goldRain', title: 'GOLDEN STORMS', desc: 'Buy GOLDEN STORMS so rain carries golden pixels.' },
   { level: 17, feature: 'rainbow', title: 'RAINBOW MODE', desc: 'Buy RAINBOW MODE for rare rainbow pixels. Pop one and every pixel pays x5 for a few seconds.' },
   { level: 18, feature: 'overclock', title: 'OVERCLOCK', desc: 'Buy OVERCLOCK to run every machine 25% faster.' },
-  { level: 20, feature: 'signal', title: 'SIGNAL', desc: 'Something is stirring beneath the grid. To be continued.' },
+  { level: 20, feature: 'boss', title: 'SIGNAL', desc: 'Something has surfaced beneath the grid. Destroy it before it burrows back down. ARMOR PIERCING is in stock.' },
 ]
 
 const featureLevel = new Map<FeatureId, number>(LEVELS.map((l) => [l.feature, l.level]))

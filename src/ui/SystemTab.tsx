@@ -65,6 +65,7 @@ export function SystemTab() {
     ['BY LASERS', fmt(st.laserKills)],
     ['BY CHAINS', fmt(st.chainKills)],
     ['NUKES', fmt(st.nukes)],
+    ['BOSSES', `${fmt(st.bossKills)} / ${fmt(st.bossKills + st.bossEscapes)}`],
   ]
 
   return (

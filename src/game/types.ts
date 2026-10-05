@@ -22,6 +22,7 @@ export type UpgradeId =
   | 'overclock'
   | 'rainbow'
   | 'blue'
+  | 'pierce'
 
 export type FeatureId =
   | 'second'
@@ -41,7 +42,7 @@ export type FeatureId =
   | 'goldRain'
   | 'rainbow'
   | 'overclock'
-  | 'signal'
+  | 'boss'
 
 export type UpgradeLevels = Record<UpgradeId, number>
 
@@ -66,6 +67,8 @@ export interface LifetimeStats {
   bestStorm: number
   mostOnScreen: number
   playTime: number
+  bossKills: number
+  bossEscapes: number
 }
 
 export interface Settings {
@@ -86,6 +89,10 @@ export interface SaveState {
   stats: LifetimeStats
   nukeCharge: number
   rainTimer: number
+  /** Seconds until the next boss surfaces. Sits at 0 while one is up. */
+  bossTimer: number
+  /** Fraction of max HP the next boss surfaces with. Below 1 after one escapes wounded. */
+  bossHealth: number
   seenUpgrades: UpgradeId[]
   reveal: { hud: boolean; panel: boolean }
   settings: Settings
@@ -93,6 +100,7 @@ export interface SaveState {
 
 export type PixelKind = 'normal' | 'golden' | 'blue' | 'rain' | 'rainbow'
 export type Cause = 'click' | 'drone' | 'chain' | 'bomb' | 'laser' | 'nuke'
+export type BossDamageSource = Exclude<Cause, 'nuke'> | 'bomblet'
 
 export type GameEvent =
   | {
@@ -119,6 +127,12 @@ export type GameEvent =
   | { type: 'rain-end'; caught: number }
   | { type: 'nuke-warn' }
   | { type: 'nuke'; count: number; amount: number }
+  | { type: 'boss-rise'; x: number; y: number; tier: number }
+  | { type: 'boss-hit'; x: number; y: number; dmg: number; crit: boolean; source: BossDamageSource | 'nuke' }
+  | { type: 'boss-enrage'; x: number; y: number }
+  | { type: 'boss-eat'; x: number; y: number }
+  | { type: 'boss-defeat'; x: number; y: number; tier: number; amount: number }
+  | { type: 'boss-escape'; x: number; y: number }
   | { type: 'levelup'; level: number }
   | { type: 'achievement'; id: string }
   | { type: 'buy'; id: UpgradeId; level: number }
