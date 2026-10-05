@@ -49,6 +49,8 @@ export function sanitizeState(raw: unknown): SaveState {
   out.rainTimer = num(raw.rainTimer, base.rainTimer, 0, 3600)
   out.bossTimer = num(raw.bossTimer, base.bossTimer, 0, BOSS_INTERVAL)
   out.bossHealth = num(raw.bossHealth, 1, 0.05, 1)
+  out.reboots = Math.floor(num(raw.reboots, 0, 0, 999))
+  out.crashPending = bool(raw.crashPending, false)
 
   if (isObj(raw.upgrades)) {
     for (const id of Object.keys(out.upgrades) as UpgradeId[]) {

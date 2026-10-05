@@ -29,6 +29,12 @@ export type Cue =
   | 'boss-eat'
   | 'boss-defeat'
   | 'boss-escape'
+  | 'emp-charge'
+  | 'emp'
+  | 'emp-blocked'
+  | 'final-defeat'
+  | 'final-rise'
+  | 'final-surfaced'
 
 interface CueOpts {
   pitch?: number
@@ -161,6 +167,33 @@ export class Sfx {
       case 'boss-escape':
         ;[392, 330, 262, 196].forEach((f, i) => this.tone('triangle', f, f * 0.98, 0.16, 0.35, i * 0.12))
         break
+      case 'emp-charge':
+        this.tone('sawtooth', 120, 900, 2.4, 0.3)
+        break
+      case 'emp':
+        this.noise(0.6, 0.9, 3000)
+        this.tone('square', 1200, 60, 0.5, 0.5)
+        break
+      case 'emp-blocked':
+        ;[880, 1175, 1568].forEach((f, i) => this.tone('square', f, f, 0.08, 0.4, i * 0.05))
+        break
+      case 'final-rise':
+        // A rising roar as the arena is sucked in, over a sub-bass drone, with the signal stuttering.
+        this.swell(2.9, 0.9, 150, 7000)
+        this.tone('sine', 42, 55, 3, 1)
+        this.tone('sawtooth', 55, 110, 2.9, 0.18)
+        ;[0.35, 0.8, 1.2, 1.55, 1.9, 2.15, 2.4, 2.6].forEach((d, i) => this.tone('square', 1800 - i * 120, 300, 0.05, 0.22, d))
+        break
+      case 'final-surfaced':
+        this.noise(1.8, 1.3, 2600)
+        this.tone('sine', 90, 22, 1.6, 1.3)
+        ;[131, 165, 196].forEach((f) => this.tone('square', f, f * 0.94, 1.2, 0.22))
+        break
+      case 'final-defeat':
+        this.noise(2.2, 1.2, 800)
+        this.tone('sine', 110, 20, 2, 1.2)
+        ;[1568, 1319, 1047, 784, 523, 392, 262].forEach((f, i) => this.tone('square', f, f * 0.97, 0.14, 0.35, 0.3 + i * 0.12))
+        break
     }
   }
 
@@ -177,6 +210,26 @@ export class Sfx {
     osc.connect(g).connect(this.master!)
     osc.start(t)
     osc.stop(t + dur + 0.02)
+  }
+
+  /** Filtered noise that swells in and opens up from `from` Hz to `to` Hz, then cuts off. */
+  private swell(dur: number, vol: number, from: number, to: number): void {
+    const ctx = this.ctx!
+    const t = ctx.currentTime
+    const src = ctx.createBufferSource()
+    src.buffer = this.noiseBuf
+    src.loop = true
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.setValueAtTime(from, t)
+    filter.frequency.exponentialRampToValueAtTime(to, t + dur)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.001, t)
+    g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.95)
+    g.gain.linearRampToValueAtTime(0, t + dur)
+    src.connect(filter).connect(g).connect(this.master!)
+    src.start(t)
+    src.stop(t + dur)
   }
 
   private noise(dur: number, vol: number, cutoff: number): void {
@@ -231,7 +284,9 @@ export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
     case 'rainbow-start':
       return { cue: 'rainbow' }
     case 'boss-rise':
-      return { cue: 'boss-rise' }
+      return { cue: e.final ? 'final-rise' : 'boss-rise' }
+    case 'final-surfaced':
+      return { cue: 'final-surfaced' }
     case 'boss-hit':
       if (e.source === 'click') return { cue: e.crit ? 'crit' : 'boss-hit', opts: { pitch: 0.9 + Math.random() * 0.25 } }
       if (e.source === 'nuke') return null
@@ -242,6 +297,14 @@ export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
       return { cue: 'boss-defeat' }
     case 'boss-escape':
       return { cue: 'boss-escape' }
+    case 'emp-charge':
+      return { cue: 'emp-charge' }
+    case 'emp':
+      return { cue: 'emp' }
+    case 'emp-blocked':
+      return { cue: 'emp-blocked' }
+    case 'final-defeat':
+      return { cue: 'final-defeat' }
     default:
       return null
   }

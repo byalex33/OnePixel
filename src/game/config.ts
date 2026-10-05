@@ -92,3 +92,44 @@ export const BOSS_REWARD_XP_FRAC = 0.1
 export const BOSS_LOOT_BASE = 12
 export const BOSS_LOOT_PER_TIER = 2
 export const BOSS_LOOT_MAX = 30
+
+/**
+ * PIXEL ZERO, the final boss: the very first pixel. It surfaces instead of the
+ * regular boss once every FINAL_EVERY kills. Killing it crashes the screen.
+ */
+export const FINAL_NAME = 'PIXEL ZERO'
+export const FINAL_EVERY = 5
+export const FINAL_RADIUS = 22
+export const FINAL_SPEED = 6
+export const FINAL_ENRAGED_SPEED = 11
+export const FINAL_FIGHT_TIME = 90
+/** A slower, more dramatic rise than the regular boss, while it pulls the arena into itself. */
+export const FINAL_RISE = 3
+/** Max HP of the first PIXEL ZERO; each later one (infinite mode) doubles it. */
+export const FINAL_HP = 400_000
+/** It heals far less than the regular boss, from eating and between attempts, so persistence wins. */
+export const FINAL_EAT_HEAL = 0.0025
+export const FINAL_ESCAPE_RECOVER = 0.05
+/** A nuke takes a fair chunk, once per fight. */
+export const FINAL_NUKE_FRACTION = 0.1
+/** Bombs and lasers hit PIXEL ZERO much harder than regular bosses, so the machines pull their weight. */
+export const FINAL_MACHINE_MULT: Partial<Record<'bomb' | 'bomblet' | 'laser', number>> = { bomb: 8, bomblet: 8, laser: 4 }
+export const FINAL_REWARD_VALUE = 2000
+export const FINAL_REWARD_XP_FRAC = 0.5
+/** Weak spots: only taps can hit them, for extra damage. They hop elsewhere when hit and every few seconds. */
+export const FINAL_SPOTS = 2
+export const FINAL_SPOT_RADIUS = 4.5
+export const FINAL_SPOT_MULT = 5
+export const FINAL_SPOT_MOVE = 3.5
+/** EMP: the core charges up. Tap it before it fires, or your drones are jammed for a while. */
+export const FINAL_EMP_INTERVAL = 14
+export const FINAL_EMP_ENRAGED_INTERVAL = 9
+export const FINAL_EMP_CHARGE = 2.5
+export const FINAL_EMP_JAM = 5
+export const FINAL_CORE_RADIUS = 6
+export const FINAL_CORE_MULT = 3
+
+/** Each REBOOT (prestige): prices x2 and bosses x1.6 tougher, but pixels are worth x2.5 more, for good. */
+export const REBOOT_PRICE_MULT = 2
+export const REBOOT_BOSS_HP_MULT = 1.6
+export const REBOOT_VALUE_MULT = 2.5

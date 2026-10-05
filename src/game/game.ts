@@ -1,6 +1,6 @@
 import * as C from './config'
 import { ACHIEVEMENTS } from './achievements'
-import { bossMaxHp, comboMult, computeStats, xpToNext, type Stats } from './formulas'
+import { bossMaxHp, comboMult, computeStats, finalMaxHp, rebootBossHpMult, xpToNext, type Stats } from './formulas'
 import { hasFeature } from './levels'
 import { Rng } from './rng'
 import { createInitialState } from './state'
@@ -96,6 +96,14 @@ export interface Boss {
   enraged: boolean
   /** It only takes nuke damage once per fight. */
   nuked: boolean
+  /** PIXEL ZERO, the final boss, rather than a regular one. */
+  final: boolean
+  /** PIXEL ZERO's tap-only weak spots, as offsets from its centre, and seconds until they hop. */
+  spots: { dx: number; dy: number }[]
+  spotTimer: number
+  /** Seconds until PIXEL ZERO's next EMP starts charging, and seconds left on a charge (0 when idle). */
+  empTimer: number
+  empCharge: number
 }
 
 export interface Rect {
@@ -139,6 +147,8 @@ export class Game {
   nuke: { t: number } | null = null
   boss: Boss | null = null
   frenzy = 0
+  /** Seconds left of an EMP jam: drones hang dead in the air. */
+  droneJam = 0
   /** Seconds of rainbow mode left; every pixel pays `stats.rainbowMult` while it runs. */
   rainbow = 0
   rainbowTimer: number
@@ -246,7 +256,7 @@ export class Game {
   }
 
   canBuy(id: UpgradeId): boolean {
-    return isUnlocked(this.state, id) && !isMaxed(this.state, id) && this.state.pixels >= costOf(id, this.state.upgrades[id])
+    return isUnlocked(this.state, id) && !isMaxed(this.state, id) && this.state.pixels >= costOf(id, this.state.upgrades[id], this.state.reboots)
   }
 
   buy(id: UpgradeId): boolean {
@@ -254,7 +264,7 @@ export class Game {
       this.emit({ type: 'denied' })
       return false
     }
-    this.state.pixels -= costOf(id, this.state.upgrades[id])
+    this.state.pixels -= costOf(id, this.state.upgrades[id], this.state.reboots)
     this.state.upgrades[id] += 1
     this.markSeen(id)
     this.refreshStats()
@@ -326,18 +336,76 @@ export class Game {
     }
   }
 
+  /** The next boss to surface is PIXEL ZERO: after every FINAL_EVERY regular kills. */
+  get finalDue(): boolean {
+    const st = this.state.stats
+    return st.bossKills >= C.FINAL_EVERY * (st.finalKills + 1)
+  }
+
+  /** While PIXEL ZERO is up nothing else spawns: it is just the player and the boss. */
+  get lockdown(): boolean {
+    return this.boss?.final === true
+  }
+
+  /** CONTINUE on the crash screen: infinite mode, the bosses keep coming. */
+  continueAfterCrash(): void {
+    this.state.crashPending = false
+    this.revision++
+  }
+
+  /** PIXEL ZERO arrives alone: every pixel on screen is pulled into it (no reward) and any storm stops. */
+  private clearArenaFor(at: { x: number; y: number }): void {
+    const points: number[] = []
+    for (const p of this.pixels) {
+      if (p.dead) continue
+      p.dead = true
+      points.push(p.x, p.y)
+    }
+    this.pixels = []
+    this.respawns = []
+    if (this.rain.active) {
+      this.rain.active = false
+      this.state.rainTimer = this.stats.rainInterval
+      this.emit({ type: 'rain-end', caught: this.rain.caught })
+    }
+    this.emit({ type: 'final-absorb', x: at.x, y: at.y, points })
+  }
+
   /** Bring the boss up now. Normally driven by `state.bossTimer`; public for tests and the dev console. */
   spawnBoss(): Boss {
-    const tier = this.state.stats.bossKills + 1
-    const maxHp = bossMaxHp(tier)
+    const st = this.state.stats
+    const final = this.finalDue
+    const tier = final ? st.finalKills + 1 : st.bossKills + 1
+    const maxHp = final ? finalMaxHp(tier, this.state.reboots) : Math.round(bossMaxHp(tier) * rebootBossHpMult(this.state.reboots))
     const hp = Math.max(1, Math.round(maxHp * this.state.bossHealth))
-    const r = C.BOSS_RADIUS
+    const r = final ? C.FINAL_RADIUS : C.BOSS_RADIUS
     const pos = this.findBossPos(r)
     const a = this.rng.range(0, Math.PI * 2)
-    this.boss = { x: pos.x, y: pos.y, vx: Math.cos(a), vy: Math.sin(a), r, hp, maxHp, tier, phase: 'rise', t: 0, timeLeft: C.BOSS_FIGHT_TIME, eatTimer: C.BOSS_EAT_INTERVAL, enraged: hp <= maxHp * C.BOSS_ENRAGE_AT, nuked: false }
+    this.boss = {
+      x: pos.x,
+      y: pos.y,
+      vx: Math.cos(a),
+      vy: Math.sin(a),
+      r,
+      hp,
+      maxHp,
+      tier,
+      phase: 'rise',
+      t: 0,
+      timeLeft: final ? C.FINAL_FIGHT_TIME : C.BOSS_FIGHT_TIME,
+      eatTimer: C.BOSS_EAT_INTERVAL,
+      enraged: hp <= maxHp * C.BOSS_ENRAGE_AT,
+      nuked: false,
+      final,
+      spots: final ? Array.from({ length: C.FINAL_SPOTS }, () => this.randomSpot(r)) : [],
+      spotTimer: C.FINAL_SPOT_MOVE,
+      empTimer: C.FINAL_EMP_INTERVAL,
+      empCharge: 0,
+    }
     // Held at 0 while the boss is up, so reloading mid-fight brings it straight back.
     this.state.bossTimer = 0
-    this.emit({ type: 'boss-rise', x: pos.x, y: pos.y, tier })
+    this.emit({ type: 'boss-rise', x: pos.x, y: pos.y, tier, final })
+    if (final) this.clearArenaFor(pos)
     this.revision++
     return this.boss
   }
@@ -360,6 +428,7 @@ export class Game {
     this.updateRainbow(dt)
     this.updateBoss(dt)
     if (this.frenzy > 0) this.frenzy = Math.max(0, this.frenzy - dt)
+    if (this.droneJam > 0) this.droneJam = Math.max(0, this.droneJam - dt)
 
     // Compact dead entities once per tick.
     if (this.pixels.some((p) => p.dead)) this.pixels = this.pixels.filter((p) => !p.dead)
@@ -663,7 +732,7 @@ export class Game {
     const boss = this.fightingBoss()
     if (boss && !boss.nuked) {
       boss.nuked = true
-      this.damageBoss(boss.maxHp * C.BOSS_NUKE_FRACTION, false, 'nuke', boss.x, boss.y)
+      this.damageBoss(boss.maxHp * (boss.final ? C.FINAL_NUKE_FRACTION : C.BOSS_NUKE_FRACTION), false, 'nuke', boss.x, boss.y)
     }
     this.bombs = []
     this.lasers = []
@@ -701,7 +770,7 @@ export class Game {
   }
 
   private updateRespawns(dt: number): void {
-    if (this.respawns.length === 0) return
+    if (this.respawns.length === 0 || this.lockdown) return
     const remaining: Respawn[] = []
     const due: Respawn[] = []
     for (const r of this.respawns) {
@@ -735,7 +804,7 @@ export class Game {
         phase: this.rng.range(0, Math.PI * 2),
       })
     }
-    if (this.drones.length === 0) return
+    if (this.drones.length === 0 || this.droneJam > 0) return
 
     const byId = new Map<number, Pixel>()
     for (const p of this.pixels) if (!p.dead) byId.set(p.id, p)
@@ -1012,7 +1081,7 @@ export class Game {
     if (!this.stats.rainEnabled) return
     const r = this.rain
     if (!r.active) {
-      if (this.nuke) return
+      if (this.nuke || this.lockdown) return
       this.state.rainTimer -= dt
       if (this.state.rainTimer <= 0) {
         r.active = true
@@ -1056,7 +1125,7 @@ export class Game {
       }
     }
     // One rainbow pixel at a time, and never while the mode is already running.
-    if (!Number.isFinite(this.stats.rainbowInterval) || this.nuke || this.rainbow > 0) return
+    if (!Number.isFinite(this.stats.rainbowInterval) || this.nuke || this.rainbow > 0 || this.lockdown) return
     if (this.pixels.some((p) => p.kind === 'rainbow' && !p.dead)) return
     this.rainbowTimer -= dt
     if (this.rainbowTimer <= 0) {
@@ -1094,23 +1163,57 @@ export class Game {
 
   /** One hit from a source. Machines do flat damage; taps can crit and ride the combo. */
   private hitBoss(source: BossDamageSource, x: number, y: number): void {
-    if (!this.fightingBoss()) return
+    const b = this.fightingBoss()
+    if (!b) return
     const s = this.stats
     let dmg = C.BOSS_DAMAGE[source] * s.bossDamage
+    if (b.final && (source === 'bomb' || source === 'bomblet' || source === 'laser')) dmg *= C.FINAL_MACHINE_MULT[source] ?? 1
     let crit = false
+    let weak = 1
     if (source === 'click') {
       crit = s.critChance > 0 && this.rng.chance(s.critChance)
       if (crit) dmg *= s.critMult
       if (s.comboCap > 0) dmg *= comboMult(this.combo.count, s.comboCap)
+      weak = this.weakSpotHit(x, y)
+      dmg *= weak
     }
-    this.damageBoss(dmg, crit, source, x, y)
+    this.damageBoss(dmg, crit, source, x, y, weak > 1)
   }
 
-  private damageBoss(dmg: number, crit: boolean, source: BossDamageSource | 'nuke', x: number, y: number): void {
+  /**
+   * PIXEL ZERO's tap-only targets. Tapping the charging core stops the EMP;
+   * tapping a weak spot hits hard and sends the spot elsewhere. Returns the damage multiplier.
+   */
+  private weakSpotHit(x: number, y: number): number {
+    const b = this.fightingBoss()
+    if (!b?.final) return 1
+    if (b.empCharge > 0 && Math.hypot(x - b.x, y - b.y) <= C.FINAL_CORE_RADIUS + 1) {
+      b.empCharge = 0
+      b.empTimer = b.enraged ? C.FINAL_EMP_ENRAGED_INTERVAL : C.FINAL_EMP_INTERVAL
+      this.emit({ type: 'emp-blocked', x: b.x, y: b.y })
+      return C.FINAL_CORE_MULT
+    }
+    const i = b.spots.findIndex((sp) => Math.hypot(x - (b.x + sp.dx), y - (b.y + sp.dy)) <= C.FINAL_SPOT_RADIUS + 1)
+    if (i < 0) return 1
+    b.spots[i] = this.randomSpot(b.r)
+    return C.FINAL_SPOT_MULT
+  }
+
+  /** A weak spot somewhere on the body, clear of the core. */
+  private randomSpot(r: number): { dx: number; dy: number } {
+    const lim = r - C.FINAL_SPOT_RADIUS - 1
+    for (;;) {
+      const dx = this.rng.range(-lim, lim)
+      const dy = this.rng.range(-lim, lim)
+      if (Math.hypot(dx, dy) > C.FINAL_CORE_RADIUS + C.FINAL_SPOT_RADIUS) return { dx, dy }
+    }
+  }
+
+  private damageBoss(dmg: number, crit: boolean, source: BossDamageSource | 'nuke', x: number, y: number, weak = false): void {
     const b = this.fightingBoss()
     if (!b) return
     b.hp = Math.max(0, b.hp - dmg)
-    this.emit({ type: 'boss-hit', x, y, dmg, crit, source })
+    this.emit({ type: 'boss-hit', x, y, dmg, crit, source, weak })
     this.revision++
     if (b.hp <= 0) {
       this.defeatBoss(b)
@@ -1124,6 +1227,10 @@ export class Game {
   }
 
   private defeatBoss(b: Boss): void {
+    if (b.final) {
+      this.defeatFinal(b)
+      return
+    }
     this.boss = null
     const amount = this.stats.value * C.BOSS_REWARD_VALUE * b.tier
     this.emit({ type: 'boss-defeat', x: b.x, y: b.y, tier: b.tier, amount })
@@ -1147,13 +1254,54 @@ export class Game {
     this.revision++
   }
 
+  /** PIXEL ZERO is dead: a huge payout, then the screen crashes and the player picks REBOOT or CONTINUE. */
+  private defeatFinal(b: Boss): void {
+    this.boss = null
+    this.droneJam = 0
+    const amount = this.stats.value * C.FINAL_REWARD_VALUE * b.tier
+    this.earn(amount, true)
+    this.addXp(xpToNext(this.state.level) * C.FINAL_REWARD_XP_FRAC)
+    this.state.stats.finalKills++
+    this.state.bossTimer = C.BOSS_INTERVAL
+    this.state.bossHealth = 1
+    this.state.crashPending = true
+    this.refreshStats()
+    this.emit({ type: 'final-defeat', x: b.x, y: b.y, amount })
+    this.revision++
+  }
+
+  private updateFinal(b: Boss, dt: number): void {
+    b.spotTimer -= dt
+    if (b.spotTimer <= 0) {
+      b.spotTimer = C.FINAL_SPOT_MOVE
+      b.spots = b.spots.map(() => this.randomSpot(b.r))
+    }
+    if (b.empCharge > 0) {
+      b.empCharge -= dt
+      if (b.empCharge <= 0) {
+        b.empCharge = 0
+        b.empTimer = b.enraged ? C.FINAL_EMP_ENRAGED_INTERVAL : C.FINAL_EMP_INTERVAL
+        this.droneJam = C.FINAL_EMP_JAM
+        this.emit({ type: 'emp', x: b.x, y: b.y })
+        this.revision++
+      }
+      return
+    }
+    b.empTimer -= dt
+    if (b.empTimer <= 0) {
+      b.empCharge = C.FINAL_EMP_CHARGE
+      this.emit({ type: 'emp-charge', x: b.x, y: b.y })
+      this.revision++
+    }
+  }
+
   private escapeBoss(b: Boss): void {
     b.phase = 'sink'
     b.t = 0
     this.state.stats.bossEscapes++
     this.state.bossTimer = C.BOSS_INTERVAL
     // It keeps its wounds, so a tough tier becomes a siege rather than a wall.
-    this.state.bossHealth = Math.min(1, b.hp / b.maxHp + C.BOSS_ESCAPE_RECOVER)
+    this.state.bossHealth = Math.min(1, b.hp / b.maxHp + (b.final ? C.FINAL_ESCAPE_RECOVER : C.BOSS_ESCAPE_RECOVER))
     this.emit({ type: 'boss-escape', x: b.x, y: b.y })
     this.revision++
   }
@@ -1168,9 +1316,10 @@ export class Game {
     }
     if (b.phase === 'rise') {
       b.t += dt
-      if (b.t >= C.BOSS_RISE) {
+      if (b.t >= (b.final ? C.FINAL_RISE : C.BOSS_RISE)) {
         b.phase = 'fight'
         b.t = 0
+        if (b.final) this.emit({ type: 'final-surfaced', x: b.x, y: b.y })
         this.revision++
       }
       return
@@ -1189,6 +1338,7 @@ export class Game {
       this.escapeBoss(b)
       return
     }
+    if (b.final) this.updateFinal(b, dt)
 
     // Wander, but lean towards the nearest pixel it could swallow.
     let prey: Pixel | null = null
@@ -1214,7 +1364,7 @@ export class Game {
     const vy = b.vx * sn + b.vy * c
     b.vx = vx
     b.vy = vy
-    const speed = b.enraged ? C.BOSS_ENRAGED_SPEED : C.BOSS_SPEED
+    const speed = b.final ? (b.enraged ? C.FINAL_ENRAGED_SPEED : C.FINAL_SPEED) : b.enraged ? C.BOSS_ENRAGED_SPEED : C.BOSS_SPEED
     const px = b.x
     const py = b.y
     b.x += b.vx * speed * dt
@@ -1247,7 +1397,7 @@ export class Game {
       if (prey && !prey.dead && Math.max(Math.abs(prey.x - b.x), Math.abs(prey.y - b.y)) <= b.r + C.BOSS_EAT_REACH) {
         prey.dead = true
         if (prey.slot) this.queueRespawn()
-        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * C.BOSS_EAT_HEAL)
+        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * (b.final ? C.FINAL_EAT_HEAL : C.BOSS_EAT_HEAL))
         this.emit({ type: 'boss-eat', x: prey.x, y: prey.y })
         this.revision++
       }

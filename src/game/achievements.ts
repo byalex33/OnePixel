@@ -38,4 +38,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'lvl20', name: 'SIGNAL FOUND', desc: 'Reach level 20.', check: (s) => s.level >= 20 },
   { id: 'boss', name: 'DEAD PIXEL', desc: 'Defeat the boss.', check: (s) => s.stats.bossKills >= 1, hidden: true },
   { id: 'boss5', name: 'BOSS RUSH', desc: 'Defeat 5 bosses.', check: (s) => s.stats.bossKills >= 5, hidden: true },
+  { id: 'final', name: 'SYSTEM CRASH', desc: 'Destroy PIXEL ZERO.', check: (s) => s.stats.finalKills >= 1, hidden: true },
+  { id: 'reboot', name: 'OFF AND ON AGAIN', desc: 'Reboot the system.', check: (s) => s.reboots >= 1, hidden: true },
 ]

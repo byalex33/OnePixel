@@ -1,4 +1,4 @@
-import { BLUE_LEVEL, COMBO_STEP } from './config'
+import { BLUE_LEVEL, COMBO_STEP, FINAL_HP, REBOOT_BOSS_HP_MULT, REBOOT_PRICE_MULT, REBOOT_VALUE_MULT } from './config'
 import { hasFeature } from './levels'
 import type { FeatureId, SaveState, UpgradeId } from './types'
 
@@ -45,6 +45,12 @@ export const comboMult = (count: number, cap: number) => 1 + COMBO_STEP * Math.m
 export const OVERCLOCK = 0.8
 /** Boss HP by tier (tier 1 is the first boss). */
 export const bossMaxHp = (tier: number) => Math.round(25000 * Math.pow(1.25, Math.max(0, tier - 1)))
+/** PIXEL ZERO's max HP: doubles with each one killed (infinite mode), and with reboots like every boss. */
+export const finalMaxHp = (tier: number, reboots: number) => Math.round(FINAL_HP * Math.pow(2, Math.max(0, tier - 1)) * rebootBossHpMult(reboots))
+/** Prestige: each reboot makes prices and bosses harder, and pixels worth more. */
+export const rebootPriceMult = (reboots: number) => Math.pow(REBOOT_PRICE_MULT, reboots)
+export const rebootBossHpMult = (reboots: number) => Math.pow(REBOOT_BOSS_HP_MULT, reboots)
+export const rebootValueMult = (reboots: number) => Math.pow(REBOOT_VALUE_MULT, reboots)
 /** Every boss defeated permanently adds +5% pixel value. */
 export const bossBonus = (kills: number) => 1 + 0.05 * kills
 /** Armor piercing: boss damage multiplier. */
@@ -101,7 +107,7 @@ export function computeStats(s: SaveState): Stats {
   return {
     respawnTime: respawnTime(u.respawn),
     maxPixels: 1 + (has('multi', 'second') ? u.multi : 0),
-    value: valueMult(u.value) * levelBonus(s.level) * achievementBonus(s.achievements.length) * bossBonus(s.stats.bossKills),
+    value: valueMult(u.value) * levelBonus(s.level) * achievementBonus(s.achievements.length) * bossBonus(s.stats.bossKills) * rebootValueMult(s.reboots),
     xpPerKill: xpMult(u.xp) * lateXpBonus(s.level),
     critChance: has('critChance', 'crit') ? critChance(u.critChance) : 0,
     critMult: critMult(u.critPower),

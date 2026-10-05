@@ -46,6 +46,17 @@ interface Arc {
 
 const ARC_LIFE = 0.2
 
+/** A pixel being pulled into PIXEL ZERO as it rises. */
+interface Absorb {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  delay: number
+  dur: number
+  t: number
+}
+
 const FONT = '"Press Start 2P", ui-monospace, monospace'
 const MAX_TEXTS = 40
 
@@ -53,6 +64,19 @@ const MAX_TEXTS = 40
 const BOSS_CELLS = 7
 const BOSS_EYES = new Set([2 * BOSS_CELLS + 2, 2 * BOSS_CELLS + 4])
 const BOSS_MOUTH = new Set([4 * BOSS_CELLS + 2, 4 * BOSS_CELLS + 3, 4 * BOSS_CELLS + 4])
+/** PIXEL ZERO: three sub-pixel columns of ZERO_ROWS segments each, which die in a fixed order. */
+const ZERO_ROWS = 5
+const ZERO_ORBIT = 12
+const ZERO_DEATH_ORDER = (() => {
+  const order = [...Array(3 * ZERO_ROWS).keys()]
+  let seed = 11
+  for (let i = order.length - 1; i > 0; i--) {
+    seed = (seed * 16807) % 2147483647
+    const j = seed % (i + 1)
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  return order
+})()
 /** The order cells crack in: a fixed shuffle, so damage reads the same every fight. */
 const BOSS_CRACK_ORDER = (() => {
   const order = [...Array(BOSS_CELLS * BOSS_CELLS).keys()].filter((i) => !BOSS_EYES.has(i) && !BOSS_MOUTH.has(i))
@@ -96,6 +120,7 @@ export class Renderer {
   private texts: FloatText[] = []
   private zaps: Zap[] = []
   private arcs: Arc[] = []
+  private absorbs: Absorb[] = []
   private flash: { t: number; dur: number; color: string; alpha: number } = { t: 1, dur: 1, color: PAL.white, alpha: 0 }
   private trauma = 0
   private freeze = 0
@@ -123,6 +148,7 @@ export class Renderer {
     this.texts = []
     this.zaps = []
     this.arcs = []
+    this.absorbs = []
     this.stage = -1
     this.resize(this.cssW, this.cssH, this.dpr, true)
   }
@@ -241,11 +267,57 @@ export class Renderer {
           this.levelFx()
           break
         case 'boss-rise':
-          this.bossRiseFx(e.x * this.scale, e.y * this.scale)
+          this.bossRiseFx(e.x * this.scale, e.y * this.scale, e.final)
+          break
+        case 'emp-charge':
+          this.text(e.x * this.scale, (e.y - C.FINAL_RADIUS) * this.scale - this.ps * 2, 'EMP CHARGING - TAP THE CORE!', PAL.cyan, 10, 1.6)
+          break
+        case 'emp-blocked': {
+          const x = e.x * this.scale
+          const y = e.y * this.scale
+          this.ring(x, y, this.ps * 6, 0.4, PAL.gold, true, false)
+          this.particles.burst(x, y, this.lowFx ? 16 : 36, 260 * this.k, 0.6, 3, [C_GOLD, C_WHITE, C_CYAN], 120 * this.k)
+          this.text(x, y - this.ps * 3, 'EMP BLOCKED', PAL.gold, 12, 1.2)
+          break
+        }
+        case 'emp': {
+          const x = e.x * this.scale
+          const y = e.y * this.scale
+          this.ring(x, y, Math.hypot(this.cssW, this.cssH), 0.9, PAL.cyan, true, false)
+          this.setFlash(PAL.cyan, 0.35, 0.5)
+          this.addTrauma(0.5)
+          this.text(this.cssW / 2, this.cssH / 2, 'DRONES JAMMED', PAL.cyan, 14, 1.6)
+          break
+        }
+        case 'final-absorb': {
+          const s = this.scale
+          for (let i = 0; i < e.points.length; i += 2) {
+            const d = Math.hypot(e.points[i] - e.x, e.points[i + 1] - e.y)
+            this.absorbs.push({ x0: e.points[i] * s, y0: e.points[i + 1] * s, x1: e.x * s, y1: e.y * s, delay: Math.random() * 0.5, dur: 0.8 + d / 220 + Math.random() * 0.3, t: 0 })
+          }
+          break
+        }
+        case 'final-surfaced': {
+          const x = e.x * this.scale
+          const y = e.y * this.scale
+          const far = Math.hypot(this.cssW, this.cssH)
+          this.setFlash(PAL.white, 0.9, 0.8)
+          this.addTrauma(1)
+          this.freeze = Math.max(this.freeze, 0.1)
+          this.ring(x, y, far, 1.1, PAL.white, true, false)
+          this.ring(x, y, far * 0.7, 1.4, PAL.cyan, true, false)
+          this.ring(x, y, far * 0.4, 1.7, PAL.blue, true, true)
+          this.particles.burst(x, y, this.lowFx ? 80 : 220, 520 * this.k, 1.3, Math.max(3, Math.round(this.ps * 0.35)), [C_WHITE, C_CYAN, C_BLUE, C_WHITE], 60 * this.k)
+          this.text(this.cssW / 2, this.cssH / 2 + 40, 'NOTHING ELSE MATTERS NOW', PAL.light, 9, 2.2)
+          break
+        }
+        case 'final-defeat':
+          this.bossDefeatFx(e.x * this.scale, e.y * this.scale, e.amount, true)
           break
         case 'boss-hit':
           this.bossHitAt = this.time
           if (e.source === 'click' || e.source === 'nuke') this.bossHitFx(e)
+          if (e.weak) this.text(e.x * this.scale, e.y * this.scale - this.ps * 3, 'WEAK SPOT!', PAL.gold, 10, 0.8)
           else {
             bossDmg += e.dmg
             this.particles.burst(e.x * this.scale, e.y * this.scale, 2, 90 * this.k, 0.3, 2, [C_RED, C_WHITE])
@@ -425,14 +497,15 @@ export class Renderer {
     }
   }
 
-  private bossRiseFx(x: number, y: number): void {
-    this.addTrauma(0.6)
-    this.setFlash(PAL.red, 0.2, 0.5)
-    this.ring(x, y, Math.hypot(this.cssW, this.cssH) * 0.5, 1.4, PAL.red, true, false)
+  private bossRiseFx(x: number, y: number, final: boolean): void {
+    const color = final ? PAL.cyan : PAL.red
+    this.addTrauma(final ? 1 : 0.6)
+    this.setFlash(color, final ? 0.35 : 0.2, 0.5)
+    this.ring(x, y, Math.hypot(this.cssW, this.cssH) * (final ? 0.9 : 0.5), 1.4, color, true, false)
     this.ring(x, y, this.ps * 5, 0.8, PAL.white, true, true)
-    this.particles.burst(x, y, this.lowFx ? 30 : 70, 260 * this.k, 1, Math.max(3, Math.round(this.ps * 0.3)), [C_DARK, C_MID, C_RED, C_RED], 300 * this.k)
-    this.text(this.cssW / 2, this.cssH / 2 - 14, '!! WARNING !!', PAL.red, this.cssW < 500 ? 14 : 20, 1.8)
-    this.text(this.cssW / 2, this.cssH / 2 + 14, `${C.BOSS_NAME} HAS SURFACED`, PAL.white, 9, 1.8)
+    this.particles.burst(x, y, this.lowFx ? 30 : 70, 260 * this.k, 1, Math.max(3, Math.round(this.ps * 0.3)), final ? [C_DARK, C_WHITE, C_CYAN, C_CYAN] : [C_DARK, C_MID, C_RED, C_RED], 300 * this.k)
+    this.text(this.cssW / 2, this.cssH / 2 - 14, final ? '!! FINAL WARNING !!' : '!! WARNING !!', color, this.cssW < 500 ? 14 : 20, final ? 2.6 : 1.8)
+    this.text(this.cssW / 2, this.cssH / 2 + 14, `${final ? C.FINAL_NAME : C.BOSS_NAME} HAS SURFACED`, PAL.white, 9, final ? 2.6 : 1.8)
   }
 
   private bossHitFx(e: Extract<GameEvent, { type: 'boss-hit' }>): void {
@@ -454,23 +527,23 @@ export class Renderer {
     }
   }
 
-  private bossDefeatFx(x: number, y: number, amount: number): void {
+  private bossDefeatFx(x: number, y: number, amount: number, final = false): void {
     this.setFlash(PAL.white, 0.7, 0.9)
     this.addTrauma(0.9)
     this.freeze = Math.max(this.freeze, 0.12)
     this.ring(x, y, Math.hypot(this.cssW, this.cssH) * 0.8, 1.3, PAL.white, true, false)
     this.ring(x, y, Math.hypot(this.cssW, this.cssH) * 0.45, 1, PAL.red, true, false)
-    const half = C.BOSS_RADIUS * this.scale
+    const half = (final ? C.FINAL_RADIUS : C.BOSS_RADIUS) * this.scale
     const n = this.lowFx ? 120 : 300
     for (let i = 0; i < n; i++) {
       const px = x + (Math.random() - 0.5) * half * 2
       const py = y + (Math.random() - 0.5) * half * 2
       const a = Math.atan2(py - y, px - x)
       const v = (120 + Math.random() * 420) * this.k
-      const c = [C_RED, C_PINK, C_WHITE, C_GOLD, C_VIOLET][i % 5]
+      const c = final ? [C_CYAN, C_BLUE, C_WHITE, C_GOLD, C_VIOLET][i % 5] : [C_RED, C_PINK, C_WHITE, C_GOLD, C_VIOLET][i % 5]
       this.particles.add(px, py, Math.cos(a) * v, Math.sin(a) * v, 0.7 + Math.random(), 2 + Math.random() * 5, c, 260)
     }
-    this.text(x, y - 18, 'BOSS DOWN', PAL.red, 20, 2.2)
+    this.text(x, y - 18, final ? 'SYSTEM FAILURE' : 'BOSS DOWN', final ? PAL.cyan : PAL.red, 20, 2.2)
     this.text(x, y + 14, `+${fmt(amount)}`, PAL.gold, 16, 2.2)
   }
 
@@ -519,6 +592,11 @@ export class Renderer {
     for (const z of this.zaps) z.t += dt
     this.zaps = this.zaps.filter((z) => z.t < 0.12)
     for (const a of this.arcs) a.t += dt
+    for (const a of this.absorbs) {
+      a.t += dt
+      if (a.t >= a.delay + a.dur) this.particles.burst(a.x1, a.y1, 3, 80 * this.k, 0.3, 2, [C_CYAN, C_WHITE])
+    }
+    this.absorbs = this.absorbs.filter((a) => a.t < a.delay + a.dur)
     this.arcs = this.arcs.filter((a) => a.t < ARC_LIFE)
     this.flash.t += dt
     if (this.reveal < 1) this.reveal = Math.min(1, this.reveal + dt / 1.6)
@@ -707,16 +785,25 @@ export class Renderer {
 
   /** A giant stuck pixel: a block of cells that crack away as its HP falls. */
   private drawBoss(): void {
+    this.drawAbsorbs()
     const b = this.game.boss
     if (!b) return
     const ctx = this.ctx
+    const intro = b.final && b.phase === 'rise' ? Math.sin(Math.PI * Math.min(1, b.t / C.FINAL_RISE)) : 0
+    if (intro > 0) {
+      // The arena dims while PIXEL ZERO tears through the grid.
+      ctx.globalAlpha = 0.55 * intro
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, this.cssW, this.cssH)
+      ctx.globalAlpha = 1
+    }
     const s = this.scale
     const size = Math.round(b.r * 2 * s)
     const cell = size / BOSS_CELLS
     let x = Math.round(b.x * s - size / 2)
     let y = Math.round(b.y * s - size / 2)
     // Rising out of (or sinking back into) the grid: slide through the floor line at its bottom edge.
-    const shown = b.phase === 'rise' ? b.t / C.BOSS_RISE : b.phase === 'sink' ? 1 - b.t / C.BOSS_SINK : 1
+    const shown = b.phase === 'rise' ? b.t / (b.final ? C.FINAL_RISE : C.BOSS_RISE) : b.phase === 'sink' ? 1 - b.t / C.BOSS_SINK : 1
     const floor = y + size
     y += Math.round(size * (1 - Math.min(1, Math.max(0, shown))))
     if (b.enraged && b.phase === 'fight' && !this.reducedMotion) {
@@ -724,22 +811,32 @@ export class Renderer {
       y += Math.round((Math.random() - 0.5) * 3)
     }
 
+    // Clip at the floor line only while rising or sinking; once up, nothing (rim, orbiting fragments) is cut off.
     ctx.save()
     ctx.beginPath()
-    ctx.rect(x - size, floor - size * 3, size * 3, size * 3)
+    ctx.rect(x - size, floor - size * 3, size * 3, size * (b.phase === 'fight' ? 4 : 3))
     ctx.clip()
 
     // Glow.
     const pulse = 0.12 + 0.05 * Math.sin(this.time * (b.enraged ? 12 : 4))
     const glow = Math.round(size * 1.6)
     ctx.globalAlpha = pulse
-    ctx.fillStyle = PAL.red
+    ctx.fillStyle = b.final ? PAL.white : PAL.red
     ctx.fillRect(Math.round(x + size / 2 - glow / 2), Math.round(y + size / 2 - glow / 2), glow, glow)
+
+    const hit = Math.max(0, 1 - (this.time - this.bossHitAt) / 0.08)
+    if (b.final) {
+      this.drawPixelZero(b, x, y, size, hit)
+      if (b.phase === 'fight') this.drawFinalTargets(b, x + size / 2, y + size / 2)
+      ctx.restore()
+      ctx.globalAlpha = 1
+      if (intro > 0 && !this.reducedMotion) this.drawGlitch(intro)
+      return
+    }
 
     const cracked = Math.floor((1 - b.hp / b.maxHp) * BOSS_CRACK_ORDER.length * 0.85)
     const dead = new Set(BOSS_CRACK_ORDER.slice(0, cracked))
     const mouthOpen = this.time - this.bossAteAt < 0.25
-    const hit = Math.max(0, 1 - (this.time - this.bossHitAt) / 0.08)
     const gap = cell >= 6 ? 1 : 0
     const drawCells = (ox: number, oy: number, color: string, alpha: number) => {
       ctx.globalAlpha = alpha
@@ -777,6 +874,149 @@ export class Renderer {
     }
     if (hit > 0) drawCells(0, 0, PAL.white, hit * 0.8)
     ctx.restore()
+    ctx.globalAlpha = 1
+    if (intro > 0 && !this.reducedMotion) this.drawGlitch(intro)
+  }
+
+  /** Pixels streaking into PIXEL ZERO, accelerating as they go, with a short trail. */
+  private drawAbsorbs(): void {
+    if (this.absorbs.length === 0) return
+    const ctx = this.ctx
+    const size = Math.max(2, Math.round(this.ps * 0.8))
+    for (const a of this.absorbs) {
+      const p = Math.max(0, (a.t - a.delay) / a.dur)
+      for (let i = 4; i >= 0; i--) {
+        const q = Math.max(0, p - i * 0.04)
+        const e = q * q * q
+        const x = a.x0 + (a.x1 - a.x0) * e
+        const y = a.y0 + (a.y1 - a.y0) * e
+        ctx.globalAlpha = i === 0 ? 1 : 0.5 * (1 - i / 5)
+        ctx.fillStyle = i === 0 ? (p > 0 ? PAL.white : PAL.light) : PAL.cyan
+        const s = i === 0 ? size : Math.max(1, size - i)
+        ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s)
+      }
+    }
+    ctx.globalAlpha = 1
+  }
+
+  /** Horizontal tears across the screen: the signal is failing. */
+  private drawGlitch(amount: number): void {
+    const ctx = this.ctx
+    const bands = Math.round(2 + amount * 7)
+    for (let i = 0; i < bands; i++) {
+      const y = Math.random() * this.cssH
+      const h = 1 + Math.random() * 6 * amount
+      ctx.globalAlpha = 0.12 + Math.random() * 0.3 * amount
+      ctx.fillStyle = [PAL.cyan, PAL.white, PAL.blue, PAL.red][i % 4]
+      const off = (Math.random() - 0.5) * 40 * amount
+      ctx.fillRect(off, Math.round(y), this.cssW, Math.round(h))
+    }
+    ctx.globalAlpha = 1
+  }
+
+  /**
+   * PIXEL ZERO is one magnified screen pixel: red, green and blue sub-pixel
+   * bars behind a black matrix, with a single eye. Damage kills sub-pixel
+   * segments one by one; enraged, the colours glitch and split.
+   */
+  private drawPixelZero(b: NonNullable<Game['boss']>, x: number, y: number, size: number, hit: number): void {
+    const ctx = this.ctx
+    const glitch = b.enraged && !this.reducedMotion
+    // Fragments orbiting it: the pixels it has swallowed.
+    const cx = x + size / 2
+    const cy = y + size / 2
+    const bit = Math.max(2, Math.round(size * 0.05))
+    for (let i = 0; i < ZERO_ORBIT; i++) {
+      const a = this.time * (b.enraged ? 1.4 : 0.6) + (i / ZERO_ORBIT) * Math.PI * 2
+      const r = size * (0.78 + 0.06 * Math.sin(this.time * 2 + i))
+      ctx.globalAlpha = 0.85
+      ctx.fillStyle = i % 3 === 0 ? PAL.red : i % 3 === 1 ? PAL.green : PAL.blue
+      ctx.fillRect(Math.round(cx + Math.cos(a) * r - bit / 2), Math.round(cy + Math.sin(a) * r * 0.9 - bit / 2), bit, bit)
+    }
+
+    // The black matrix around the sub-pixels, with a bright rim.
+    ctx.globalAlpha = 1
+    ctx.fillStyle = PAL.light
+    ctx.fillRect(x - 2, y - 2, size + 4, size + 4)
+    ctx.fillStyle = '#050505'
+    ctx.fillRect(x, y, size, size)
+
+    const pad = Math.max(2, Math.round(size * 0.06))
+    const colW = (size - pad * 4) / 3
+    const segH = (size - pad * (ZERO_ROWS + 1)) / ZERO_ROWS
+    const dead = new Set(ZERO_DEATH_ORDER.slice(0, Math.floor((1 - b.hp / b.maxHp) * ZERO_DEATH_ORDER.length * 0.85)))
+    const colors = [PAL.red, PAL.green, PAL.blue]
+    for (let c = 0; c < 3; c++) {
+      for (let r = 0; r < ZERO_ROWS; r++) {
+        const i = c * ZERO_ROWS + r
+        const sx = Math.round(x + pad + c * (colW + pad) + (glitch ? (Math.random() - 0.5) * 4 : 0))
+        const sy = Math.round(y + pad + r * (segH + pad))
+        if (dead.has(i)) {
+          ctx.globalAlpha = 1
+          ctx.fillStyle = '#1c1c1c'
+        } else {
+          // Live segments shimmer slightly; enraged ones flash white.
+          ctx.globalAlpha = 0.85 + 0.15 * Math.sin(this.time * 5 + i)
+          ctx.fillStyle = glitch && Math.random() < 0.08 ? PAL.white : colors[c]
+        }
+        ctx.fillRect(sx, sy, Math.ceil(colW), Math.ceil(segH))
+      }
+    }
+
+    // One eye, dead centre. It looks around, and blinks now and then.
+    const eye = Math.round(size * 0.3)
+    const ex = Math.round(cx - eye / 2)
+    const ey = Math.round(cy - eye / 2)
+    const blink = (this.time % 4.3) < 0.12
+    ctx.globalAlpha = 1
+    ctx.fillStyle = '#050505'
+    ctx.fillRect(ex - 2, ey - 2, eye + 4, eye + 4)
+    ctx.fillStyle = b.enraged ? PAL.red : PAL.white
+    if (blink) ctx.fillRect(ex, Math.round(cy - 1), eye, 2)
+    else {
+      ctx.fillRect(ex, ey, eye, eye)
+      const pupil = Math.round(eye * 0.42)
+      const look = (eye - pupil) / 2
+      const px = Math.round(cx - pupil / 2 + Math.sin(this.time * 0.9) * look * 0.8)
+      const py = Math.round(cy - pupil / 2 + Math.cos(this.time * 0.7) * look * 0.5)
+      ctx.fillStyle = '#050505'
+      ctx.fillRect(px, py, pupil, pupil)
+    }
+
+    if (hit > 0) {
+      ctx.globalAlpha = hit * 0.6
+      ctx.fillStyle = PAL.white
+      ctx.fillRect(x, y, size, size)
+    }
+    ctx.globalAlpha = 1
+  }
+
+  /** PIXEL ZERO's tap targets: blinking gold weak spots, and the core while an EMP charges. */
+  private drawFinalTargets(b: NonNullable<Game['boss']>, cx: number, cy: number): void {
+    const ctx = this.ctx
+    const s = this.scale
+    const on = Math.floor(this.time * 6) % 2 === 0
+    const spot = Math.max(4, Math.round(C.FINAL_SPOT_RADIUS * 2 * s * 0.8))
+    for (const sp of b.spots) {
+      const x = Math.round(cx + sp.dx * s - spot / 2)
+      const y = Math.round(cy + sp.dy * s - spot / 2)
+      ctx.globalAlpha = 1
+      ctx.fillStyle = PAL.bg
+      ctx.fillRect(x - 2, y - 2, spot + 4, spot + 4)
+      ctx.fillStyle = on ? PAL.gold : PAL.orange
+      ctx.fillRect(x, y, spot, spot)
+    }
+    if (b.empCharge > 0) {
+      const p = 1 - b.empCharge / C.FINAL_EMP_CHARGE
+      const core = Math.round(C.FINAL_CORE_RADIUS * 2 * s * (0.7 + 0.3 * p))
+      ctx.globalAlpha = 0.35 + 0.5 * p
+      ctx.fillStyle = PAL.cyan
+      const halo = core + Math.round(this.ps * 2 * p)
+      ctx.fillRect(Math.round(cx - halo / 2), Math.round(cy - halo / 2), halo, halo)
+      ctx.globalAlpha = 1
+      ctx.fillStyle = Math.floor(this.time * (6 + 18 * p)) % 2 === 0 ? PAL.white : PAL.cyan
+      ctx.fillRect(Math.round(cx - core / 2), Math.round(cy - core / 2), core, core)
+    }
     ctx.globalAlpha = 1
   }
 
@@ -868,10 +1108,13 @@ export class Renderer {
   private drawDrones(): void {
     const ctx = this.ctx
     const bit = Math.max(2, Math.round(this.scale * 0.5))
+    const jammed = this.game.droneJam > 0
     for (const d of this.game.drones) {
       const x = Math.round(d.x * this.scale)
-      const y = Math.round(d.y * this.scale + Math.sin(d.phase * 3) * 1.5)
-      drawSprite(ctx, CURSOR, x, y, bit, { '1': PAL.light, '2': PAL.bg })
+      const y = Math.round(d.y * this.scale + (jammed ? 0 : Math.sin(d.phase * 3) * 1.5))
+      if (jammed && Math.random() < 0.15) continue // flicker
+      drawSprite(ctx, CURSOR, x, y, bit, { '1': jammed ? PAL.mid : PAL.light, '2': jammed ? PAL.dark : PAL.bg })
+      if (jammed && Math.random() < 0.05) this.particles.burst(x, y, 2, 60 * this.k, 0.25, 2, [C_CYAN, C_WHITE])
     }
   }
 

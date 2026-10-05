@@ -47,7 +47,7 @@ function UpgradeRow({ def }: { def: UpgradeDef }) {
   const s = rt.game.state
   const lvl = s.upgrades[def.id]
   const maxed = isMaxed(s, def.id)
-  const cost = costOf(def.id, lvl)
+  const cost = costOf(def.id, lvl, s.reboots)
   const afford = !maxed && s.pixels >= cost
   const isNew = lvl === 0 && !s.seenUpgrades.includes(def.id)
   const Icon = UPGRADE_ICONS[def.id]

@@ -27,7 +27,7 @@ export function SystemTab() {
   const [code, setCode] = useState('')
   const [importText, setImportText] = useState('')
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
-  const [confirm, setConfirm] = useState<'import' | 'reset' | null>(null)
+  const [confirm, setConfirm] = useState<'import' | 'reset' | 'reboot' | null>(null)
   const [credits, setCredits] = useState(false)
 
   const doExport = async () => {
@@ -71,6 +71,8 @@ export function SystemTab() {
   // Kept secret (like the boss feats) until the first boss has surfaced.
   const bossesMet = st.bossKills + st.bossEscapes
   if (bossesMet > 0) rows.push(['BOSSES', `${fmt(st.bossKills)} / ${fmt(bossesMet)}`])
+  if (st.finalKills > 0) rows.push(['PIXEL ZERO', fmt(st.finalKills)])
+  if (s.reboots > 0) rows.push(['REBOOTS', fmt(s.reboots)])
 
   return (
     <div className="space-y-4">
@@ -132,6 +134,36 @@ export function SystemTab() {
           ))}
         </dl>
       </section>
+
+      {st.finalKills > 0 && (
+        <section className="frame border-cyan/50 p-3 pt-4">
+          <span className="frame-title text-cyan!">REBOOT</span>
+          <div className="text-[17px] leading-tight text-dim">
+            Start over at level 1, keeping your feats. Prices x2 and bosses x1.6 tougher than now, but every pixel is worth x2.5 more. Forever.
+          </div>
+          {confirm === 'reboot' ? (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={`${btn} border-cyan! text-cyan!`}
+                onClick={() => {
+                  setConfirm(null)
+                  rt.reboot()
+                }}
+              >
+                REBOOT NOW
+              </button>
+              <button type="button" className={btn} onClick={() => setConfirm(null)}>
+                CANCEL
+              </button>
+            </div>
+          ) : (
+            <button type="button" className={`${btn} mt-2 w-full`} onClick={() => setConfirm('reboot')}>
+              REBOOT #{s.reboots + 1}
+            </button>
+          )}
+        </section>
+      )}
 
       <section className="frame p-3 pt-4">
         <span className="frame-title">ABOUT</span>

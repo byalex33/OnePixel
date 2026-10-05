@@ -3,6 +3,7 @@ import * as C from './config'
 import * as F from './formulas'
 import { xpToNext } from './formulas'
 import { Game, type Boss, type Pixel } from './game'
+import { rebootState } from './prestige'
 import { createInitialState } from './state'
 import type { GameEvent, SaveState } from './types'
 import { costOf, isUnlocked, maxPurchase, UPGRADE_MAP } from './upgrades'
@@ -811,5 +812,103 @@ describe('the boss', () => {
       return [b.hp, b.x, b.y, g.state.pixels]
     }
     expect(play()).toEqual(play())
+  })
+})
+
+describe('PIXEL ZERO, the final boss', () => {
+  const hits = (events: GameEvent[]) => events.filter((e): e is Extract<GameEvent, { type: 'boss-hit' }> => e.type === 'boss-hit')
+
+  /** A level 20 game that has beaten five bosses, with PIXEL ZERO risen and parked dead centre. */
+  function finalFight(patch: (s: SaveState) => void = () => {}): { g: Game; b: Boss; intro: GameEvent[] } {
+    const g = makeGame((s) => {
+      s.level = 20
+      s.stats.bossKills = C.FINAL_EVERY
+      patch(s)
+    })
+    for (let i = 0; i < 6; i++) addPixel(g, 20 + i * 30, 40)
+    const b = g.spawnBoss()
+    const intro = [...g.drainEvents(), ...run(g, C.FINAL_RISE + C.DT)]
+    Object.assign(b, { x: 120, y: 80, vx: 0, vy: 0 })
+    return { g, b, intro }
+  }
+
+  it('surfaces after five boss kills, pulls in every pixel and stops anything else spawning', () => {
+    const { g, b, intro } = finalFight()
+    expect(b.final).toBe(true)
+    expect(b.maxHp).toBe(F.finalMaxHp(1, 0))
+    const absorb = intro.find((e) => e.type === 'final-absorb')
+    if (absorb?.type !== 'final-absorb') throw new Error('no absorb event')
+    expect(absorb.points.length).toBeGreaterThanOrEqual(12)
+    expect(intro.some((e) => e.type === 'final-surfaced')).toBe(true)
+    run(g, 10)
+    expect(g.pixels).toHaveLength(0)
+  })
+
+  it('weak spots take extra damage, but only from taps', () => {
+    const { g, b } = finalFight()
+    b.spots = [{ dx: 12, dy: 0 }]
+    g.pointerDown(b.x + 12, b.y)
+    b.spots = [{ dx: 12, dy: 0 }]
+    g.pointerDown(b.x - 12, b.y + 12)
+    const dmg = hits(g.drainEvents()).map((e) => [e.dmg, e.weak])
+    expect(dmg).toEqual([
+      [C.BOSS_DAMAGE.click * C.FINAL_SPOT_MULT, true],
+      [C.BOSS_DAMAGE.click, false],
+    ])
+  })
+
+  it('bombs and lasers hit it harder than they hit regular bosses', () => {
+    const { g, b } = finalFight()
+    g['blasts'].push({ x: b.x, y: b.y + b.r + 5, r: 30, delay: 0, cause: 'bomb', group: 0, depth: 0 })
+    g.lasers.push({ x1: -500, y1: b.y, x2: 500, y2: b.y, t: 0.001, phase: 'charge', group: 0 })
+    const dmg = Object.fromEntries(hits(run(g, 0.05)).map((e) => [e.source, e.dmg]))
+    expect(dmg.bomb).toBe(C.BOSS_DAMAGE.bomb * C.FINAL_MACHINE_MULT.bomb!)
+    expect(dmg.laser).toBe(C.BOSS_DAMAGE.laser * C.FINAL_MACHINE_MULT.laser!)
+  })
+
+  it('its EMP jams drones unless the player taps the charging core', () => {
+    const { g, b } = finalFight((s) => (s.upgrades.auto = 1))
+    b.empTimer = 0.01
+    expect(run(g, 0.05).some((e) => e.type === 'emp-charge')).toBe(true)
+    g.pointerDown(b.x, b.y)
+    expect(g.drainEvents().some((e) => e.type === 'emp-blocked')).toBe(true)
+    expect(b.empCharge).toBe(0)
+    expect(g.droneJam).toBe(0)
+
+    b.empTimer = 0.01
+    const events = run(g, C.FINAL_EMP_CHARGE + 0.1)
+    expect(events.some((e) => e.type === 'emp')).toBe(true)
+    expect(g.droneJam).toBeGreaterThan(0)
+    const x = g.drones.map((d) => [d.x, d.y])
+    run(g, 0.5)
+    expect(g.drones.map((d) => [d.x, d.y])).toEqual(x) // jammed drones hang still
+  })
+
+  it('killing it crashes the screen, then CONTINUE keeps the run going', () => {
+    const { g, b } = finalFight()
+    b.hp = 1
+    g.pointerDown(b.x, b.y)
+    expect(g.drainEvents().some((e) => e.type === 'final-defeat')).toBe(true)
+    expect(g.boss).toBeNull()
+    expect(g.state.crashPending).toBe(true)
+    expect(g.state.stats.finalKills).toBe(1)
+    expect(g.state.stats.bossKills).toBe(C.FINAL_EVERY)
+    expect(g.finalDue).toBe(false) // the next one needs five more regular kills
+    g.continueAfterCrash()
+    expect(g.state.crashPending).toBe(false)
+  })
+
+  it('REBOOT starts over harder but richer, keeping feats and settings', () => {
+    const { g } = finalFight()
+    g.state.achievements = ['first', 'boss']
+    g.state.settings.sound = false
+    const next = rebootState(g.state)
+    expect([next.level, next.reboots, next.pixels, next.stats.bossKills]).toEqual([1, 1, 0, 0])
+    expect(next.achievements).toEqual(['first', 'boss'])
+    expect(next.settings.sound).toBe(false)
+    expect(costOf('respawn', 0, next.reboots)).toBe(costOf('respawn', 0) * C.REBOOT_PRICE_MULT)
+    const fresh = createInitialState()
+    fresh.achievements = next.achievements
+    expect(F.computeStats(next).value).toBeCloseTo(F.computeStats(fresh).value * C.REBOOT_VALUE_MULT)
   })
 })

@@ -31,6 +31,7 @@ export function emptyStats(): LifetimeStats {
     playTime: 0,
     bossKills: 0,
     bossEscapes: 0,
+    finalKills: 0,
   }
 }
 
@@ -51,5 +52,7 @@ export function createInitialState(): SaveState {
     seenUpgrades: [],
     reveal: { hud: false, panel: false },
     settings: { sound: true, music: true, autoNuke: true, shake: true, haptics: true },
+    reboots: 0,
+    crashPending: false,
   }
 }

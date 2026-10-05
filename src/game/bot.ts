@@ -1,4 +1,4 @@
-import { BOSS_FIGHT_TIME, DT } from './config'
+import { BOSS_FIGHT_TIME, DT, FINAL_FIGHT_TIME } from './config'
 import { Game } from './game'
 import type { GameEvent, SaveState } from './types'
 import { costOf, isMaxed, isUnlocked, UPGRADES } from './upgrades'
@@ -22,6 +22,8 @@ export interface BotResult {
   purchases: { t: number; id: string; level: number }[]
   /** Every boss fight: when it rose, how it ended, and how long it took. */
   bossLog: { t: number; tier: number; outcome: 'defeat' | 'escape'; secs: number }[]
+  /** Every PIXEL ZERO fight. */
+  finalLog: { t: number; outcome: 'defeat' | 'escape'; secs: number }[]
   game: Game
 }
 
@@ -37,6 +39,7 @@ export function runBot(opts: BotOptions): BotResult {
   const levelTimes = new Map<number, number>([[1, 0]])
   const purchases: BotResult['purchases'] = []
   const bossLog: BotResult['bossLog'] = []
+  const finalLog: BotResult['finalLog'] = []
   let bossRose = 0
   let clickCd = 0
   let buyCd = 0
@@ -48,7 +51,8 @@ export function runBot(opts: BotOptions): BotResult {
     if (clickCd <= 0) {
       const candidates = g.pixels.filter((p) => !p.dead && p.age >= opts.reaction && p.y > 0)
       const loot = candidates.find((p) => p.kind === 'golden' || p.kind === 'rainbow')
-      const boss = g.boss && g.boss.phase === 'fight' && g.boss.timeLeft < BOSS_FIGHT_TIME - opts.reaction ? g.boss : undefined
+      const fightTime = g.boss?.final ? FINAL_FIGHT_TIME : BOSS_FIGHT_TIME
+      const boss = g.boss && g.boss.phase === 'fight' && g.boss.timeLeft < fightTime - opts.reaction ? g.boss : undefined
       const target = boss ?? loot ?? candidates.find((p) => p.kind === 'blue') ?? candidates.sort((a, b) => b.age - a.age)[0]
       if (target) {
         g.pointerDown(target.x, target.y)
@@ -60,7 +64,7 @@ export function runBot(opts: BotOptions): BotResult {
       buyCd = 1
       for (;;) {
         const options = UPGRADES.filter((u) => isUnlocked(g.state, u.id) && !isMaxed(g.state, u.id))
-          .map((u) => ({ id: u.id, cost: costOf(u.id, g.state.upgrades[u.id]) }))
+          .map((u) => ({ id: u.id, cost: costOf(u.id, g.state.upgrades[u.id], g.state.reboots) }))
           .sort((a, b) => a.cost - b.cost)
         const pick = options[0]
         if (!pick || pick.cost > g.state.pixels) break
@@ -75,8 +79,12 @@ export function runBot(opts: BotOptions): BotResult {
       if (e.type === 'levelup') levelTimes.set(e.level, t)
       else if (e.type === 'boss-rise') bossRose = t
       else if (e.type === 'boss-defeat') bossLog.push({ t: bossRose, tier: e.tier, outcome: 'defeat', secs: t - bossRose })
-      else if (e.type === 'boss-escape') bossLog.push({ t: bossRose, tier: g.state.stats.bossKills + 1, outcome: 'escape', secs: t - bossRose })
+      else if (e.type === 'boss-escape' && !g.boss?.final) bossLog.push({ t: bossRose, tier: g.state.stats.bossKills + 1, outcome: 'escape', secs: t - bossRose })
+      else if (e.type === 'boss-escape') finalLog.push({ t: bossRose, outcome: 'escape', secs: t - bossRose })
+      else if (e.type === 'final-defeat') finalLog.push({ t: bossRose, outcome: 'defeat', secs: t - bossRose })
     }
+    // The bot always picks CONTINUE (infinite mode) so long runs keep climbing.
+    if (g.state.crashPending) g.continueAfterCrash()
   }
-  return { levelTimes, purchases, bossLog, game: g }
+  return { levelTimes, purchases, bossLog, finalLog, game: g }
 }

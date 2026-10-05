@@ -1,5 +1,5 @@
 import { GiNuclearBomb } from 'react-icons/gi'
-import { BOSS_NAME, COMBO_WINDOW } from '../game/config'
+import { BOSS_NAME, COMBO_WINDOW, FINAL_NAME } from '../game/config'
 import { fmt, fmtTime } from '../game/format'
 import { comboMult, xpToNext } from '../game/formulas'
 import { useRuntime } from './hooks'
@@ -23,7 +23,10 @@ export function BalanceBox({ ref }: { ref: React.Ref<HTMLDivElement> }) {
       </div>
       <div className="mt-1 text-[17px] leading-none text-dim md:text-[19px]">{rate > 0 ? `+${fmt(rate)}/s` : 'pixels'}</div>
       <div className="mt-2 flex items-baseline justify-between gap-2 font-pixel text-[7px] whitespace-nowrap text-dim md:text-[8px]">
-        <span className="text-ink">LV {s.level}</span>
+        <span className="text-ink">
+          LV {s.level}
+          {s.reboots > 0 && <span className="text-cyan"> R{s.reboots}</span>}
+        </span>
         <span className="truncate">
           {fmt(s.xp)}/{fmt(need)} XP
         </span>
@@ -64,19 +67,34 @@ export function BossBar({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const frac = b.hp / b.maxHp
   const status = b.phase === 'rise' ? 'SURFACING' : b.phase === 'sink' ? 'ESCAPING' : `${Math.ceil(b.timeLeft)}s`
   const urgent = b.phase === 'fight' && b.timeLeft <= 10
+  const jammed = rt.game.droneJam > 0
   return (
     <div
       ref={ref}
-      className="frame px-shadow anim-pop pointer-events-none absolute top-3 left-3 w-[calc(100%-212px)] max-w-[300px] border-red! p-2.5 pt-3.5 md:left-1/2 md:w-[300px] md:-translate-x-1/2 md:p-3 md:pt-4"
+      className={`frame px-shadow anim-pop pointer-events-none absolute top-3 left-3 w-[calc(100%-212px)] max-w-[300px] p-2.5 pt-3.5 md:left-1/2 md:w-[300px] md:-translate-x-1/2 md:p-3 md:pt-4 ${
+        b.final ? 'border-cyan!' : 'border-red!'
+      }`}
     >
-      <span className="frame-title text-red!">BOSS T{b.tier}</span>
+      <span className={`frame-title ${b.final ? 'text-cyan!' : 'text-red!'}`}>{b.final ? `FINAL BOSS${b.tier > 1 ? ` T${b.tier}` : ''}` : `BOSS T${b.tier}`}</span>
       <div className="flex items-baseline justify-between gap-2 font-pixel text-[8px] whitespace-nowrap md:text-[10px]">
-        <span className={`truncate ${b.enraged ? 'anim-blink-fast text-red' : 'text-hi'}`}>{b.enraged ? 'ENRAGED' : BOSS_NAME}</span>
+        <span className={`truncate ${b.enraged ? 'anim-blink-fast text-red' : 'text-hi'}`}>{b.enraged ? 'ENRAGED' : b.final ? FINAL_NAME : BOSS_NAME}</span>
         <span className={urgent ? 'anim-blink-fast text-red' : 'text-dim'}>{status}</span>
       </div>
-      <Segments value={frac} count={20} className="mt-2 h-2.5" fill={b.enraged ? 'var(--color-red)' : 'var(--color-orange)'} />
-      <div className="mt-1 font-pixel text-[7px] text-dim">
-        {fmt(Math.ceil(b.hp))}/{fmt(b.maxHp)} HP
+      <Segments
+        value={frac}
+        count={20}
+        className="mt-2 h-2.5"
+        fill={b.enraged ? 'var(--color-red)' : b.final ? 'var(--color-cyan)' : 'var(--color-orange)'}
+      />
+      <div className="mt-1 flex justify-between gap-2 font-pixel text-[7px] text-dim">
+        <span>
+          {fmt(Math.ceil(b.hp))}/{fmt(b.maxHp)} HP
+        </span>
+        {b.empCharge > 0 ? (
+          <span className="anim-blink-fast text-cyan">EMP! TAP CORE</span>
+        ) : jammed ? (
+          <span className="text-cyan">JAMMED {Math.ceil(rt.game.droneJam)}s</span>
+        ) : null}
       </div>
     </div>
   )

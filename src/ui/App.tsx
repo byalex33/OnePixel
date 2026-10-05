@@ -1,5 +1,6 @@
 import { UPGRADES_UNLOCK_LEVEL } from '../game/config'
 import { Arena } from './Arena'
+import { CrashScreen } from './CrashScreen'
 import { useMediaQuery, useRuntime } from './hooks'
 import { Panel } from './Panel'
 
@@ -15,6 +16,7 @@ export default function App() {
     >
       {showPanel && <Panel desktop={desktop} />}
       <Arena />
+      <CrashScreen />
     </div>
   )
 }

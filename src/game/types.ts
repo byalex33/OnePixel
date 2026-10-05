@@ -69,6 +69,8 @@ export interface LifetimeStats {
   playTime: number
   bossKills: number
   bossEscapes: number
+  /** PIXEL ZERO kills this run. */
+  finalKills: number
 }
 
 export interface Settings {
@@ -98,6 +100,10 @@ export interface SaveState {
   seenUpgrades: UpgradeId[]
   reveal: { hud: boolean; panel: boolean }
   settings: Settings
+  /** Times the player has chosen REBOOT (prestige). Everything costs more and pays more. */
+  reboots: number
+  /** PIXEL ZERO is dead and the crash screen is waiting for REBOOT or CONTINUE. */
+  crashPending: boolean
 }
 
 export type PixelKind = 'normal' | 'golden' | 'blue' | 'rain' | 'rainbow'
@@ -130,12 +136,19 @@ export type GameEvent =
   | { type: 'rain-end'; caught: number }
   | { type: 'nuke-warn' }
   | { type: 'nuke'; count: number; amount: number }
-  | { type: 'boss-rise'; x: number; y: number; tier: number }
-  | { type: 'boss-hit'; x: number; y: number; dmg: number; crit: boolean; source: BossDamageSource | 'nuke' }
+  | { type: 'boss-rise'; x: number; y: number; tier: number; final: boolean }
+  | { type: 'boss-hit'; x: number; y: number; dmg: number; crit: boolean; source: BossDamageSource | 'nuke'; weak?: boolean }
   | { type: 'boss-enrage'; x: number; y: number }
   | { type: 'boss-eat'; x: number; y: number }
   | { type: 'boss-defeat'; x: number; y: number; tier: number; amount: number }
   | { type: 'boss-escape'; x: number; y: number }
+  | { type: 'emp-charge'; x: number; y: number }
+  | { type: 'emp-blocked'; x: number; y: number }
+  | { type: 'emp'; x: number; y: number }
+  | { type: 'final-defeat'; x: number; y: number; amount: number }
+  /** PIXEL ZERO pulls every pixel on screen into itself; points are flattened x, y pairs. */
+  | { type: 'final-absorb'; x: number; y: number; points: number[] }
+  | { type: 'final-surfaced'; x: number; y: number }
   | { type: 'levelup'; level: number }
   | { type: 'achievement'; id: string }
   | { type: 'buy'; id: UpgradeId; level: number }

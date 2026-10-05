@@ -239,6 +239,33 @@
   animation: slide-in-up 0.4s steps(8) both;
 }
 
+/* The crash screen cuts in like a dying signal: black, blue, black, blue. */
+@keyframes crash-glitch {
+  0%,
+  30% {
+    filter: brightness(0);
+    transform: translateX(0);
+  }
+  31%,
+  50% {
+    filter: none;
+    transform: translateX(-6px);
+  }
+  51%,
+  70% {
+    filter: brightness(0);
+    transform: translateX(4px);
+  }
+  71%,
+  100% {
+    filter: none;
+    transform: translateX(0);
+  }
+}
+.anim-crash-glitch {
+  animation: crash-glitch 0.7s steps(1) both;
+}
+
 /* Overflowing text: hold, slide to reveal the end, hold, slide back. */
 @keyframes marquee {
   0%,
@@ -314,6 +341,7 @@
   .anim-blink-fast,
   .anim-jolt,
   .anim-marquee,
+  .anim-crash-glitch,
   .rainbow-ring,
   .rainbow-text {
     animation: none;

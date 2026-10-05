@@ -59,9 +59,10 @@ export const UPGRADES: UpgradeDef[] = [
 
 export const UPGRADE_MAP = Object.fromEntries(UPGRADES.map((d) => [d.id, d])) as Record<UpgradeId, UpgradeDef>
 
-export function costOf(id: UpgradeId, level: number): number {
+/** Price of the next level. Every REBOOT multiplies all prices. */
+export function costOf(id: UpgradeId, level: number, reboots = 0): number {
   const d = UPGRADE_MAP[id]
-  return F.upgradeCost(d.baseCost, d.growth, level)
+  return F.upgradeCost(d.baseCost, d.growth, level) * F.rebootPriceMult(reboots)
 }
 
 export function isUnlocked(state: SaveState, id: UpgradeId): boolean {
@@ -89,7 +90,7 @@ export function maxPurchase(state: SaveState, id: UpgradeId): { count: number; c
   let count = 0
   let cost = 0
   while (lvl < max) {
-    const c = costOf(id, lvl)
+    const c = costOf(id, lvl, state.reboots)
     if (c > money) break
     money -= c
     cost += c

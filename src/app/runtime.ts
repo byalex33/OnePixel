@@ -6,6 +6,7 @@ import { offlineGains, offlineSeconds, type OfflineGains } from '../game/offline
 import { exportSave, importSave, loadFrom, makeSaveFile, writeTo, type KeyValueStore } from '../game/save'
 import { SAVE_KEY } from '../game/config'
 import type { GameEvent, Settings, UpgradeId } from '../game/types'
+import { rebootState } from '../game/prestige'
 import { Renderer } from '../render/renderer'
 
 export type Notice =
@@ -138,7 +139,8 @@ export class Runtime {
     const dt = Math.min(0.25, Math.max(0, (now - this.last) / 1000))
     this.last = now
 
-    this.acc += dt
+    // The world freezes behind the crash screen until the player chooses.
+    this.acc = this.game.state.crashPending ? 0 : this.acc + dt
     let steps = 0
     while (this.acc >= DT && steps < MAX_STEPS_PER_FRAME) {
       this.game.tick(DT)
@@ -324,6 +326,19 @@ export class Runtime {
     const file = importSave(text)
     this.replaceGame(new Game(file.state))
     this.save()
+  }
+
+  /** REBOOT: start again from level 1, harder but richer. Feats and settings carry over. */
+  reboot(): void {
+    this.replaceGame(new Game(rebootState(this.game.state)))
+    this.save()
+  }
+
+  /** CONTINUE on the crash screen: keep playing in infinite mode. */
+  continueAfterCrash(): void {
+    this.game.continueAfterCrash()
+    this.save()
+    this.bump()
   }
 
   reset(): void {

@@ -21,7 +21,7 @@ export function Panel({ desktop }: { desktop: boolean }) {
   const [tab, setTab] = useState<Tab>('upg')
   const [open, setOpen] = useState(true)
   const s = rt.game.state
-  const affordable = UPGRADES.filter((u) => isUnlocked(s, u.id) && !isMaxed(s, u.id) && s.pixels >= costOf(u.id, s.upgrades[u.id])).length
+  const affordable = UPGRADES.filter((u) => isUnlocked(s, u.id) && !isMaxed(s, u.id) && s.pixels >= costOf(u.id, s.upgrades[u.id], s.reboots)).length
 
   const select = (t: Tab) => {
     if (!desktop && t === tab) setOpen((o) => !o)
