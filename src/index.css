@@ -239,6 +239,24 @@
   animation: slide-in-up 0.4s steps(8) both;
 }
 
+/* Overflowing text: hold, slide to reveal the end, hold, slide back. */
+@keyframes marquee {
+  0%,
+  45% {
+    transform: translateX(0);
+  }
+  60%,
+  85% {
+    transform: translateX(var(--marquee-shift, 0));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+.anim-marquee {
+  animation: marquee 7s ease-in-out infinite;
+}
+
 /* First-run "click me!" hint: the arrow draws itself in, then gently bobs. */
 @keyframes hint-draw {
   from {
@@ -295,6 +313,7 @@
   .anim-blink,
   .anim-blink-fast,
   .anim-jolt,
+  .anim-marquee,
   .rainbow-ring,
   .rainbow-text {
     animation: none;

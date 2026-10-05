@@ -6,6 +6,7 @@ import { upcomingUnlocks } from '../game/levels'
 import type { UpgradeId } from '../game/types'
 import { costOf, isMaxed, isUnlocked, maxPurchase, unlockLevelOf, UPGRADES, type UpgradeDef } from '../game/upgrades'
 import { useRuntime } from './hooks'
+import { Marquee } from './Marquee'
 import { UPGRADE_ICONS } from './icons'
 import { Segments } from './Segments'
 
@@ -79,7 +80,7 @@ function UpgradeRow({ def }: { def: UpgradeDef }) {
         </div>
         <div className="mt-0.5 text-[17px] leading-tight text-dim">{def.desc}</div>
         <div className="mt-1.5 flex items-center justify-between gap-2">
-          <span className="min-w-0 truncate text-[18px] leading-none whitespace-nowrap">
+          <Marquee className="flex-1 text-[18px] leading-none" title={maxed ? def.show(lvl) : `${def.show(lvl)} > ${def.show(lvl + 1)}`}>
             <span className="text-ink">{def.show(lvl)}</span>
             {!maxed && (
               <>
@@ -87,7 +88,7 @@ function UpgradeRow({ def }: { def: UpgradeDef }) {
                 <span className={afford ? 'text-hi' : 'text-dim'}>{def.show(lvl + 1)}</span>
               </>
             )}
-          </span>
+          </Marquee>
           {!maxed && (
             <div className="flex shrink-0 items-center gap-1.5">
               {showMax && (
