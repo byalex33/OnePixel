@@ -6,7 +6,6 @@
 
 A retro dot-matrix incremental game about destroying a single pixel, and then a few more, and then rather a lot of them.
 
-[![Stars](https://img.shields.io/github/stars/byalex33/OnePixel?style=flat-square&color=ffcc33&labelColor=171717)](https://github.com/byalex33/OnePixel/stargazers)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-7a7a7a?style=flat-square&labelColor=171717)
 ![React](https://img.shields.io/badge/React-19-7a7a7a?style=flat-square&labelColor=171717)
 ![Vite](https://img.shields.io/badge/Vite-8-7a7a7a?style=flat-square&labelColor=171717)
@@ -289,16 +288,8 @@ Hosted on Vercel, configured in `vercel.json` (Vite build, output `dist`).
 - Sampled sound pack
 - Creatures to share the arena
 
-Ideas and bug reports are welcome in [issues](https://github.com/byalex33/OnePixel/issues).
-
 ## Credits
 
 - Fonts: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P), [VT323](https://fonts.google.com/specimen/VT323) and [Caveat](https://fonts.google.com/specimen/Caveat), via Google Fonts (SIL Open Font License)
-- Icons: [react-icons](https://react-icons.github.io/react-icons/), including [Game Icons](https://game-icons.net/) (CC BY 3.0) and [Font Awesome](https://fontawesome.com/) (CC BY 4.0)
+- Icons: [react-icons](https://react-icons.github.io/react-icons/), including [Game Icons](https://game-icons.net/) (CC BY 3.0)
 - Built with [Vite](https://vite.dev/), [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS](https://tailwindcss.com/) and [Vitest](https://vitest.dev/)
-
-<div align="center">
-
-If OnePixel made you click one pixel too many, consider giving it a **[star on GitHub](https://github.com/byalex33/OnePixel)**.
-
-</div>

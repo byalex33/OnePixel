@@ -1,6 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { FaGithub, FaStar } from 'react-icons/fa'
-import { REPO_URL } from '../app/links'
 import type { Rect } from '../game/game'
 import { useRuntime } from './hooks'
 import { ClickMeHint } from './ClickMeHint'
@@ -13,7 +11,6 @@ export function Arena() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const balanceRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const starRef = useRef<HTMLAnchorElement>(null)
   const bossRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<() => void>(() => {})
   const hud = rt.game.state.reveal.hud
@@ -31,7 +28,7 @@ export function Arena() {
       const box = wrap.getBoundingClientRect()
       // Keep pixels from spawning underneath HUD overlays.
       const rects: Rect[] = []
-      for (const el of [balanceRef.current, bottomRef.current, starRef.current, bossRef.current]) {
+      for (const el of [balanceRef.current, bottomRef.current, bossRef.current]) {
         if (!el) continue
         const r = el.getBoundingClientRect()
         if (r.width === 0) continue
@@ -62,7 +59,7 @@ export function Arena() {
   useEffect(() => {
     measureRef.current()
     const ro = new ResizeObserver(() => measureRef.current())
-    for (const el of [balanceRef.current, bottomRef.current, starRef.current, bossRef.current]) if (el) ro.observe(el)
+    for (const el of [balanceRef.current, bottomRef.current, bossRef.current]) if (el) ro.observe(el)
     return () => ro.disconnect()
   }, [hud, level, nukeEnabled, rainEnabled, bossUp])
 
@@ -94,17 +91,6 @@ export function Arena() {
       <Toasts />
       <LevelUpOverlay />
       <OfflineModal />
-      <a
-        ref={starRef}
-        href={REPO_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="frame px-shadow absolute right-3 bottom-3 flex items-center gap-2 px-2.5 py-2 font-pixel text-[8px] tracking-wider text-dim hover:border-hi hover:text-hi"
-      >
-        <FaGithub className="size-3.5" aria-hidden="true" />
-        <FaStar className="size-3 text-gold" aria-hidden="true" />
-        STAR ON GITHUB
-      </a>
     </main>
   )
 }
