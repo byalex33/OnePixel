@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { GiSave, GiSpeaker, GiSpeakerOff } from 'react-icons/gi'
+import { GiMusicalNotes, GiSave, GiSpeaker, GiSpeakerOff } from 'react-icons/gi'
 import { fmt, fmtTime } from '../game/format'
 import { SaveError } from '../game/save'
 import type { Settings } from '../game/types'
@@ -15,6 +15,7 @@ function Toggle({ k, label }: { k: keyof Settings; label: string }) {
       <span className="font-pixel text-[9px] text-hi">[{on ? 'X' : ' '}]</span>
       <span className={`font-pixel text-[9px] ${on ? 'text-ink' : 'text-dim'}`}>{label}</span>
       {k === 'sound' && (on ? <GiSpeaker className="ml-auto size-4 text-dim" /> : <GiSpeakerOff className="ml-auto size-4 text-mute" />)}
+      {k === 'music' && <GiMusicalNotes className={`ml-auto size-4 ${on ? 'text-dim' : 'text-mute'}`} />}
     </button>
   )
 }
@@ -71,6 +72,7 @@ export function SystemTab() {
       <section className="frame p-3 pt-4">
         <span className="frame-title">OPTIONS</span>
         <Toggle k="sound" label="SOUND" />
+        <Toggle k="music" label="MUSIC" />
         <Toggle k="shake" label="SCREEN SHAKE" />
         <Toggle k="haptics" label="HAPTICS" />
       </section>
