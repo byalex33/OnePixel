@@ -20,6 +20,7 @@ A retro dot-matrix incremental game about destroying a single pixel, and then a 
 
 ## Contents
 
+- [Trailer](#trailer)
 - [The idea](#the-idea)
 - [How to play](#how-to-play)
 - [Features](#features)
@@ -34,6 +35,14 @@ A retro dot-matrix incremental game about destroying a single pixel, and then a 
 - [Deploying](#deploying)
 - [Roadmap](#roadmap)
 - [Credits](#credits)
+
+## Trailer
+
+A 46-second tour from the very first pixel to a screen full of lasers. Click the poster to watch.
+
+<div align="center">
+<a href="docs/trailer/onepixel-trailer.mp4"><img src="docs/trailer/poster.png" alt="OnePixel trailer: rainbow mode, crossing laser beams and a x23 combo" width="900"></a>
+</div>
 
 ## The idea
 
@@ -196,6 +205,7 @@ npm run dev
 | `npm test` | Vitest: game maths, progression, saves and pacing |
 | `npm run balance` | Run the simulated players and print the levelling timeline |
 | `npm run screenshots` | Regenerate the README screenshots (needs `npm run dev` running and Chrome or Edge installed) |
+| `npm run trailer` | Render the trailer to `docs/trailer/` (needs `npm run dev` running, Chrome or Edge, and ffmpeg) |
 
 **Dev console.** In development builds the runtime is exposed as `window.op`, which is handy for playtesting:
 
