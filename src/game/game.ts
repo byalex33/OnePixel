@@ -47,6 +47,8 @@ export interface Bomb {
   r: number
   mini: boolean
   group: number
+  /** A cluster bomblet in flight from (x0, y0) to (x1, y1); the fuse starts once it lands. */
+  arc?: { x0: number; y0: number; x1: number; y1: number; dur: number; t: number }
 }
 
 export interface Laser {
@@ -185,6 +187,13 @@ export class Game {
     this.respawns.forEach(scaleAll)
     this.drones.forEach(scaleAll)
     this.bombs.forEach(scaleAll)
+    for (const b of this.bombs) {
+      if (!b.arc) continue
+      b.arc.x0 *= sx
+      b.arc.x1 *= sx
+      b.arc.y0 *= sy
+      b.arc.y1 *= sy
+    }
     this.blasts.forEach(scaleAll)
     if (this.boss) scaleAll(this.boss)
     for (const l of this.lasers) {
@@ -816,6 +825,15 @@ export class Game {
     if (this.bombs.length === 0) return
     const live: Bomb[] = []
     for (const b of this.bombs) {
+      const a = b.arc
+      if (a && a.t < a.dur) {
+        a.t = Math.min(a.dur, a.t + dt)
+        const p = a.t / a.dur
+        b.x = a.x0 + (a.x1 - a.x0) * p
+        b.y = a.y0 + (a.y1 - a.y0) * p
+        live.push(b)
+        continue
+      }
       b.x += b.vx * dt
       b.y += b.vy * dt
       b.vx *= Math.pow(0.04, dt)
@@ -828,26 +846,54 @@ export class Game {
         continue
       }
       this.blasts.push({ x: b.x, y: b.y, r: b.r, delay: 0, cause: 'bomb', group: b.group, depth: 0, mini: b.mini })
-      if (!b.mini && this.stats.cluster) {
-        for (let i = 0; i < 3; i++) {
-          const a = this.rng.range(0, Math.PI * 2)
-          const v = this.rng.range(45, 70)
-          live.push({
-            id: this.nextId++,
-            x: b.x,
-            y: b.y,
-            vx: Math.cos(a) * v,
-            vy: Math.sin(a) * v,
-            fuse: C.BOMBLET_FUSE + i * 0.08,
-            total: C.BOMBLET_FUSE + i * 0.08,
-            r: C.BOMBLET_RADIUS,
-            mini: true,
-            group: b.group,
-          })
-        }
-      }
+      if (!b.mini && this.stats.cluster) live.push(...this.scatterBomblets(b))
     }
     this.bombs = live
+  }
+
+  /**
+   * Cluster bomblets are lobbed to the biggest crowds elsewhere on the map,
+   * clear of the parent blast and of each other, so they find fresh pixels.
+   */
+  private scatterBomblets(b: Bomb): Bomb[] {
+    const clear = b.r + C.BOMBLET_RADIUS
+    const pool = this.pixels.filter((p) => !p.dead && Math.hypot(p.x - b.x, p.y - b.y) > clear)
+    const targets: { x: number; y: number }[] = []
+    for (let i = 0; i < C.CLUSTER_BOMBLETS; i++) {
+      let best: { x: number; y: number } | null = null
+      let bestScore = -1
+      for (const c of pool) {
+        if (targets.some((t) => Math.hypot(t.x - c.x, t.y - c.y) < C.BOMBLET_RADIUS * 2.5)) continue
+        let crowd = 0
+        for (const p of pool) if (Math.hypot(p.x - c.x, p.y - c.y) <= C.BOMBLET_RADIUS) crowd++
+        const score = crowd + this.rng.next() // biggest crowd first, random tie-break
+        if (score > bestScore) {
+          bestScore = score
+          best = c
+        }
+      }
+      if (!best) {
+        // Nothing left out there: fan out evenly around the blast instead.
+        const a = (i / C.CLUSTER_BOMBLETS) * Math.PI * 2 + this.rng.range(-0.5, 0.5)
+        const d = clear + this.rng.range(20, 50)
+        const m = C.SPAWN_MARGIN
+        best = { x: Math.max(m, Math.min(this.w - m, b.x + Math.cos(a) * d)), y: Math.max(m, Math.min(this.h - m, b.y + Math.sin(a) * d)) }
+      }
+      targets.push({ x: best.x, y: best.y })
+    }
+    return targets.map((t, i) => ({
+      id: this.nextId++,
+      x: b.x,
+      y: b.y,
+      vx: 0,
+      vy: 0,
+      fuse: C.BOMBLET_FUSE,
+      total: C.BOMBLET_FUSE,
+      r: C.BOMBLET_RADIUS,
+      mini: true,
+      group: b.group,
+      arc: { x0: b.x, y0: b.y, x1: t.x, y1: t.y, dur: C.BOMBLET_FLIGHT + Math.hypot(t.x - b.x, t.y - b.y) / 400 + i * 0.06, t: 0 },
+    }))
   }
 
   private dropBomb(): void {
@@ -895,7 +941,7 @@ export class Game {
         b.x = b.target.x
         b.y = b.target.y
       }
-      this.emit({ type: 'blast', x: b.x, y: b.y, r: b.r, cause: b.cause })
+      this.emit({ type: 'blast', x: b.x, y: b.y, r: b.r, cause: b.cause, mini: b.mini })
       const reach = b.r + C.PIXEL_SIZE / 2
       for (const p of this.pixels) {
         if (p.dead || (b.cause === 'chain' && !autoCanTake(p))) continue

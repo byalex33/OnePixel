@@ -198,7 +198,7 @@ export class Renderer {
           }
           break
         case 'blast':
-          this.blast(e.x * this.scale, e.y * this.scale, e.r * this.scale, e.cause)
+          this.blast(e.x * this.scale, e.y * this.scale, e.r * this.scale, e.cause, e.mini)
           break
         case 'laser-fire':
           this.laserFire(e.x1, e.y1, e.x2, e.y2)
@@ -343,9 +343,14 @@ export class Renderer {
     }
   }
 
-  private blast(x: number, y: number, r: number, cause: string): void {
+  private blast(x: number, y: number, r: number, cause: string, mini = false): void {
     const k = this.k
-    if (cause === 'click') {
+    if (cause === 'bomb' && mini) {
+      this.ring(x, y, r * 1.2, 0.35, PAL.orange, true, false)
+      this.ring(x, y, r * 0.5, 0.2, PAL.gold, false, false)
+      this.particles.burst(x, y, this.lowFx ? 14 : 28, 220 * k, 0.55, Math.max(2, Math.round(this.ps * 0.25)), [C_RED, C_ORANGE, C_GOLD, C_WHITE], 140 * k)
+      this.addTrauma(0.15)
+    } else if (cause === 'click') {
       this.ring(x, y, r, 0.25, PAL.light, true, true)
     } else if (cause === 'bomb') {
       this.ring(x, y, r * 1.1, 0.45, PAL.orange, true, false)
@@ -777,22 +782,46 @@ export class Renderer {
 
   private drawBombs(): void {
     const ctx = this.ctx
+    const s = this.scale
     for (const b of this.game.bombs) {
-      const bit = Math.max(2, Math.round(this.scale * (b.mini ? 0.75 : 1.15)))
-      const x = b.x * this.scale
-      const y = b.y * this.scale
-      const urgency = 1 - b.fuse / b.total
-      const blink = Math.floor(this.time * (4 + urgency * 22)) % 2 === 0
-      if (!b.mini) {
-        // Telegraph the blast radius.
-        ctx.strokeStyle = PAL.red
-        ctx.globalAlpha = 0.15 + 0.25 * urgency
-        ctx.setLineDash([2, 4])
-        ctx.beginPath()
-        ctx.arc(x, y, b.r * this.scale, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.setLineDash([])
+      const bit = Math.max(2, Math.round(s * (b.mini ? 0.75 : 1.15)))
+      let x = b.x * s
+      let y = b.y * s
+      const a = b.arc
+      const flying = a !== undefined && a.t < a.dur
+      const urgency = flying ? 0 : 1 - b.fuse / b.total
+      const blink = Math.floor(this.time * (flying ? 16 : 4 + urgency * 22)) % 2 === 0
+      // Telegraph the blast radius (a bomblet's landing spot while it is still in the air).
+      const tx = a ? a.x1 * s : x
+      const ty = a ? a.y1 * s : y
+      ctx.strokeStyle = PAL.red
+      ctx.globalAlpha = flying ? 0.1 + 0.35 * (a.t / a.dur) : 0.15 + 0.25 * urgency
+      ctx.setLineDash([2, 4])
+      ctx.beginPath()
+      ctx.arc(tx, ty, b.r * s, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.globalAlpha = 1
+      if (flying) {
+        const lift = (t: number) => Math.sin(Math.PI * t) * Math.max(22, Math.hypot(a.x1 - a.x0, a.y1 - a.y0) * 0.4) * s
+        const at = (t: number) => [(a.x0 + (a.x1 - a.x0) * t) * s, (a.y0 + (a.y1 - a.y0) * t) * s - lift(t)]
+        const p = a.t / a.dur
+        // Shadow on the ground, shrinking as the bomblet climbs.
+        const sh = Math.max(2, Math.round(bit * (3 - lift(p) / (s * 25))))
+        ctx.fillStyle = PAL.dark
+        ctx.fillRect(Math.round(x - sh / 2), Math.round(y - 1), sh, 2)
+        // Ember trail along the arc.
+        for (let i = 1; i <= 7; i++) {
+          const q = p - i * 0.035
+          if (q <= 0) break
+          const [qx, qy] = at(q)
+          ctx.globalAlpha = 0.75 * (1 - i / 8)
+          ctx.fillStyle = i < 3 ? PAL.gold : PAL.orange
+          const d = Math.max(1, bit - Math.floor(i / 3))
+          ctx.fillRect(Math.round(qx - d / 2), Math.round(qy - d / 2), d, d)
+        }
         ctx.globalAlpha = 1
+        ;[x, y] = at(p)
       }
       const w = BOMB[0].length * bit
       drawSprite(ctx, BOMB, x - w / 2, y - w / 2 - bit, bit, {

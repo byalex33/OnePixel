@@ -514,6 +514,30 @@ describe('combat mechanics', () => {
     expect(events.some((e) => e.type === 'nuke-warn')).toBe(true)
   })
 
+  it('cluster bomblets are lobbed to crowds away from the parent blast', () => {
+    const g = makeGame((s) => {
+      s.level = 14
+      s.upgrades.bomb = 1
+      s.upgrades.cluster = 1
+    }, 5)
+    g.pixels = []
+    g.respawns = []
+    const crowds = [
+      [200, 120],
+      [200, 30],
+      [60, 130],
+    ].flatMap(([x, y]) => [addPixel(g, x, y), addPixel(g, x + 4, y), addPixel(g, x, y + 4)])
+    const r = g.stats.bombRadius
+    g.bombs.push({ id: 999, x: 40, y: 40, vx: 0, vy: 0, fuse: 0.001, total: 1, r, mini: false, group: 0 })
+    run(g, 0.05)
+    const bomblets = g.bombs.filter((b) => b.mini)
+    expect(bomblets).toHaveLength(C.CLUSTER_BOMBLETS)
+    for (const b of bomblets) expect(Math.hypot(b.arc!.x1 - 40, b.arc!.y1 - 40)).toBeGreaterThan(r + C.BOMBLET_RADIUS)
+    run(g, 2)
+    expect(g.bombs).toHaveLength(0)
+    expect(crowds.every((p) => p.dead)).toBe(true)
+  })
+
   it('pixel rain storms start, spawn falling pixels and end', () => {
     const g = makeGame((s) => {
       s.level = 10

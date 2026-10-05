@@ -30,7 +30,10 @@ export const GOLDEN_XP_MULT = 5
 export const RAINBOW_LIFETIME = 4.5
 
 export const BOMB_FUSE = 1.1
-export const BOMBLET_FUSE = 0.45
+/** Cluster bomblets are lobbed across the map, then blink briefly before bursting. */
+export const CLUSTER_BOMBLETS = 3
+export const BOMBLET_FLIGHT = 0.55 // base seconds in the air; longer throws take longer
+export const BOMBLET_FUSE = 0.18
 export const BOMBLET_RADIUS = 13
 
 export const CHAIN_RADIUS = 13

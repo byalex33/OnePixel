@@ -118,7 +118,7 @@ export type GameEvent =
     }
   | { type: 'spawn'; x: number; y: number; kind: PixelKind }
   | { type: 'miss'; x: number; y: number }
-  | { type: 'blast'; x: number; y: number; r: number; cause: Cause }
+  | { type: 'blast'; x: number; y: number; r: number; cause: Cause; mini?: boolean }
   | { type: 'bomb-drop'; x: number; y: number }
   | { type: 'laser-fire'; x1: number; y1: number; x2: number; y2: number }
   | { type: 'drone-zap'; x1: number; y1: number; x2: number; y2: number }

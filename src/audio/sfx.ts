@@ -13,6 +13,7 @@ export type Cue =
   | 'blue'
   | 'miss'
   | 'bomb'
+  | 'bomblet'
   | 'chain'
   | 'laser'
   | 'nuke-warn'
@@ -106,6 +107,10 @@ export class Sfx {
       case 'bomb':
         this.noise(0.45, 0.9, 900)
         this.tone('sine', 110, 40, 0.4, 0.9)
+        break
+      case 'bomblet':
+        this.noise(0.22, 0.5, 1500)
+        this.tone('sine', 170, 55, 0.2, 0.5)
         break
       case 'chain':
         this.noise(0.12, 0.35, 2400)
@@ -204,7 +209,7 @@ export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
     case 'miss':
       return { cue: 'miss' }
     case 'blast':
-      if (e.cause === 'bomb') return { cue: 'bomb' }
+      if (e.cause === 'bomb') return { cue: e.mini ? 'bomblet' : 'bomb' }
       if (e.cause === 'chain') return { cue: 'chain' }
       return null
     case 'laser-fire':
