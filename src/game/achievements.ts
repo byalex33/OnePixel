@@ -6,6 +6,8 @@ export interface AchievementDef {
   name: string
   desc: string
   check: (s: SaveState) => boolean
+  /** Not listed until earned, so it doesn't spoil a surprise (the boss). */
+  hidden?: boolean
 }
 
 /** Each achievement permanently grants +2% pixel value. */
@@ -34,6 +36,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'lvl10', name: 'DOUBLE DIGITS', desc: 'Reach level 10.', check: (s) => s.level >= 10 },
   { id: 'lvl15', name: 'VETERAN', desc: 'Reach level 15.', check: (s) => s.level >= 15 },
   { id: 'lvl20', name: 'SIGNAL FOUND', desc: 'Reach level 20.', check: (s) => s.level >= 20 },
-  { id: 'boss', name: 'DEAD PIXEL', desc: 'Defeat the boss.', check: (s) => s.stats.bossKills >= 1 },
-  { id: 'boss5', name: 'BOSS RUSH', desc: 'Defeat 5 bosses.', check: (s) => s.stats.bossKills >= 5 },
+  { id: 'boss', name: 'DEAD PIXEL', desc: 'Defeat the boss.', check: (s) => s.stats.bossKills >= 1, hidden: true },
+  { id: 'boss5', name: 'BOSS RUSH', desc: 'Defeat 5 bosses.', check: (s) => s.stats.bossKills >= 5, hidden: true },
 ]
