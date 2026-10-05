@@ -65,7 +65,7 @@ export function BossBar({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const b = rt.game.boss
   if (!b) return null
   const frac = b.hp / b.maxHp
-  const status = b.phase === 'rise' ? 'SURFACING' : b.phase === 'sink' ? 'ESCAPING' : `${Math.ceil(b.timeLeft)}s`
+  const status = b.phase === 'rise' ? 'SURFACING' : b.phase === 'sink' ? 'ESCAPING' : b.phase === 'die' ? 'CRITICAL' : `${Math.ceil(b.timeLeft)}s`
   const urgent = b.phase === 'fight' && b.timeLeft <= 10
   const jammed = rt.game.droneJam > 0
   return (

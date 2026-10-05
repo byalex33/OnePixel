@@ -27,6 +27,7 @@ const freq = (midi: number) => 440 * 2 ** ((midi - 69) / 12)
 export class Music {
   private enabled = true
   private paused = false
+  private silenced = false
   private ctx: AudioContext | null = null
   private bus: GainNode | null = null
   private echo: GainNode | null = null
@@ -69,6 +70,13 @@ export class Music {
     this.update()
   }
 
+  /** Hush for a dramatic moment (the crash screen). Cheap to call every frame. */
+  setSilenced(silenced: boolean): void {
+    if (silenced === this.silenced) return
+    this.silenced = silenced
+    this.update()
+  }
+
   private update(): void {
     const ctx = this.ctx
     if (!ctx || !this.bus) return
@@ -76,7 +84,7 @@ export class Music {
     const now = ctx.currentTime
     g.cancelScheduledValues(now)
     g.setValueAtTime(g.value, now)
-    if (this.enabled && !this.paused) {
+    if (this.enabled && !this.paused && !this.silenced) {
       g.linearRampToValueAtTime(VOLUME, now + FADE_IN)
       if (!this.timer) {
         this.nextAt = now + 0.1

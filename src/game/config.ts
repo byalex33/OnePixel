@@ -105,6 +105,8 @@ export const FINAL_ENRAGED_SPEED = 11
 export const FINAL_FIGHT_TIME = 90
 /** A slower, more dramatic rise than the regular boss, while it pulls the arena into itself. */
 export const FINAL_RISE = 3
+/** Seconds of death animation (shatter, collapse to one pixel, screen switch-off) before the crash screen. */
+export const FINAL_DEATH = 4
 /** Max HP of the first PIXEL ZERO; each later one (infinite mode) doubles it. */
 export const FINAL_HP = 400_000
 /** It heals far less than the regular boss, from eating and between attempts, so persistence wins. */

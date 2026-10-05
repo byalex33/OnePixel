@@ -3,7 +3,7 @@ import { fmt } from '../game/format'
 import type { Game } from '../game/game'
 import type { GameEvent } from '../game/types'
 import { buildField, paintField, sceneryStage, type DotField } from './dotfield'
-import { C_BLUE, C_CYAN, C_DARK, C_GOLD, C_LIGHT, C_MID, C_ORANGE, C_PINK, C_RAINBOW, C_RED, C_VIOLET, C_WHITE, PAL, rainbowHue } from './palette'
+import { C_BLUE, C_CYAN, C_DARK, C_GOLD, C_GREEN, C_LIGHT, C_MID, C_ORANGE, C_PINK, C_RAINBOW, C_RED, C_VIOLET, C_WHITE, PAL, rainbowHue } from './palette'
 import { Particles } from './particles'
 import { BOMB, CURSOR, drawSprite, MUSHROOM, type Sprite } from './sprites'
 
@@ -121,6 +121,8 @@ export class Renderer {
   private zaps: Zap[] = []
   private arcs: Arc[] = []
   private absorbs: Absorb[] = []
+  /** PIXEL ZERO's death: when it started, and how many of its segments have burst. */
+  private zeroDeath: { at: number; burst: number } | null = null
   private flash: { t: number; dur: number; color: string; alpha: number } = { t: 1, dur: 1, color: PAL.white, alpha: 0 }
   private trauma = 0
   private freeze = 0
@@ -149,6 +151,7 @@ export class Renderer {
     this.zaps = []
     this.arcs = []
     this.absorbs = []
+    this.zeroDeath = null
     this.stage = -1
     this.resize(this.cssW, this.cssH, this.dpr, true)
   }
@@ -312,7 +315,7 @@ export class Renderer {
           break
         }
         case 'final-defeat':
-          this.bossDefeatFx(e.x * this.scale, e.y * this.scale, e.amount, true)
+          this.startZeroDeath(e.amount)
           break
         case 'boss-hit':
           this.bossHitAt = this.time
@@ -788,6 +791,10 @@ export class Renderer {
     this.drawAbsorbs()
     const b = this.game.boss
     if (!b) return
+    if (b.phase === 'die') {
+      this.drawZeroDeath(b)
+      return
+    }
     const ctx = this.ctx
     const intro = b.final && b.phase === 'rise' ? Math.sin(Math.PI * Math.min(1, b.t / C.FINAL_RISE)) : 0
     if (intro > 0) {
@@ -830,7 +837,6 @@ export class Renderer {
       if (b.phase === 'fight') this.drawFinalTargets(b, x + size / 2, y + size / 2)
       ctx.restore()
       ctx.globalAlpha = 1
-      if (intro > 0 && !this.reducedMotion) this.drawGlitch(intro)
       return
     }
 
@@ -875,7 +881,90 @@ export class Renderer {
     if (hit > 0) drawCells(0, 0, PAL.white, hit * 0.8)
     ctx.restore()
     ctx.globalAlpha = 1
-    if (intro > 0 && !this.reducedMotion) this.drawGlitch(intro)
+  }
+
+  /** PIXEL ZERO is dead: freeze-frame and flash. The rest plays in `drawZeroDeath`. */
+  private startZeroDeath(amount: number): void {
+    this.zeroDeath = { at: this.time, burst: 0 }
+    this.freeze = Math.max(this.freeze, 0.15)
+    this.setFlash(PAL.white, 1, 0.5)
+    this.addTrauma(1)
+    this.text(this.cssW / 2, this.cssH / 2 - 60, `+${fmt(amount)}`, PAL.gold, 18, 2.2)
+  }
+
+  /**
+   * The death of PIXEL ZERO, in real time while the world is frozen: it shakes and
+   * shatters segment by segment, implodes back into a single pixel, flickers out,
+   * and the screen switches off like an old CRT.
+   */
+  private drawZeroDeath(b: NonNullable<Game['boss']>): void {
+    const d = this.zeroDeath
+    if (!d) return
+    const ctx = this.ctx
+    const t = this.time - d.at
+    const s = this.scale
+    const size = Math.round(b.r * 2 * s)
+    const cx = b.x * s
+    const cy = b.y * s
+    const calm = this.reducedMotion ? 0.25 : 1
+    const SHATTER = 2.4
+    const COLLAPSE = 3.0
+    const FLICKER = 3.4
+    const OFF = C.FINAL_DEATH
+
+    // The arena drains to black.
+    ctx.globalAlpha = Math.min(0.85, t / SHATTER)
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, this.cssW, this.cssH)
+    ctx.globalAlpha = 1
+
+    if (t < SHATTER) {
+      const p = t / SHATTER
+      // Sub-pixel segments burst one by one.
+      const dead = Math.floor(p * ZERO_DEATH_ORDER.length)
+      while (d.burst < dead) {
+        const i = ZERO_DEATH_ORDER[d.burst++]
+        const col = Math.floor(i / ZERO_ROWS)
+        const row = i % ZERO_ROWS
+        const bx = cx - size / 2 + ((col + 0.5) / 3) * size
+        const by = cy - size / 2 + ((row + 0.5) / ZERO_ROWS) * size
+        this.particles.burst(bx, by, this.lowFx ? 10 : 24, 300 * this.k, 0.9, Math.max(2, Math.round(this.ps * 0.3)), [[C_RED, C_GREEN, C_BLUE][col], C_WHITE], 200 * this.k)
+        this.addTrauma(0.12 * calm)
+      }
+      const shake = (2 + p * 12) * calm
+      const x = Math.round(cx - size / 2 + (Math.random() - 0.5) * shake)
+      const y = Math.round(cy - size / 2 + (Math.random() - 0.5) * shake)
+      this.drawPixelZero({ ...b, hp: b.maxHp * (1 - p), enraged: true }, x, y, size, Math.random() < p * 0.3 ? 0.6 : 0)
+    } else if (t < COLLAPSE) {
+      // It implodes back into the single pixel it started as.
+      const p = (t - SHATTER) / (COLLAPSE - SHATTER)
+      const e = p * p * p
+      const sz = Math.max(this.ps, Math.round(size * (1 - e)))
+      ctx.fillStyle = PAL.red
+      ctx.fillRect(Math.round(cx - sz / 2) - 2, Math.round(cy - sz / 2), sz, sz)
+      ctx.fillStyle = PAL.blue
+      ctx.fillRect(Math.round(cx - sz / 2) + 2, Math.round(cy - sz / 2), sz, sz)
+      ctx.fillStyle = PAL.white
+      ctx.fillRect(Math.round(cx - sz / 2), Math.round(cy - sz / 2), sz, sz)
+    } else if (t < FLICKER) {
+      // One pixel left. It flickers, and goes out.
+      if (Math.floor(t * 14) % 3 !== 0) {
+        const ps = Math.round(this.ps)
+        ctx.fillStyle = PAL.white
+        ctx.fillRect(Math.round(cx - ps / 2), Math.round(cy - ps / 2), ps, ps)
+      }
+    } else {
+      // An old CRT switching off: the picture squeezes to a line, the line to a dot, then black.
+      const p = Math.min(1, (t - FLICKER) / (OFF - FLICKER))
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, this.cssW, this.cssH)
+      const w = p < 0.5 ? this.cssW : Math.max(2, this.cssW * (1 - (p - 0.5) * 2))
+      const h = p < 0.5 ? Math.max(2, this.cssH * 0.3 * (1 - p * 2)) : 2
+      ctx.globalAlpha = 1 - Math.max(0, (p - 0.85) / 0.15)
+      ctx.fillStyle = PAL.white
+      ctx.fillRect(Math.round(this.cssW / 2 - w / 2), Math.round(this.cssH / 2 - h / 2), Math.round(w), Math.round(h))
+      ctx.globalAlpha = 1
+    }
   }
 
   /** Pixels streaking into PIXEL ZERO, accelerating as they go, with a short trail. */
@@ -895,21 +984,6 @@ export class Renderer {
         const s = i === 0 ? size : Math.max(1, size - i)
         ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s)
       }
-    }
-    ctx.globalAlpha = 1
-  }
-
-  /** Horizontal tears across the screen: the signal is failing. */
-  private drawGlitch(amount: number): void {
-    const ctx = this.ctx
-    const bands = Math.round(2 + amount * 7)
-    for (let i = 0; i < bands; i++) {
-      const y = Math.random() * this.cssH
-      const h = 1 + Math.random() * 6 * amount
-      ctx.globalAlpha = 0.12 + Math.random() * 0.3 * amount
-      ctx.fillStyle = [PAL.cyan, PAL.white, PAL.blue, PAL.red][i % 4]
-      const off = (Math.random() - 0.5) * 40 * amount
-      ctx.fillRect(off, Math.round(y), this.cssW, Math.round(h))
     }
     ctx.globalAlpha = 1
   }

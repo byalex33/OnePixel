@@ -889,8 +889,12 @@ describe('PIXEL ZERO, the final boss', () => {
     b.hp = 1
     g.pointerDown(b.x, b.y)
     expect(g.drainEvents().some((e) => e.type === 'final-defeat')).toBe(true)
-    expect(g.boss).toBeNull()
     expect(g.state.crashPending).toBe(true)
+    // It lingers while its death animation plays, then the crash screen takes over.
+    expect(g.boss?.phase).toBe('die')
+    expect(g.advanceCrash(C.FINAL_DEATH / 2)).toBe(false)
+    expect(g.advanceCrash(C.FINAL_DEATH / 2)).toBe(true)
+    expect(g.boss).toBeNull()
     expect(g.state.stats.finalKills).toBe(1)
     expect(g.state.stats.bossKills).toBe(C.FINAL_EVERY)
     expect(g.finalDue).toBe(false) // the next one needs five more regular kills

@@ -87,7 +87,7 @@ export interface Boss {
   maxHp: number
   tier: number
   /** Rising out of the grid, fighting, or sinking back after escaping. */
-  phase: 'rise' | 'fight' | 'sink'
+  phase: 'rise' | 'fight' | 'sink' | 'die'
   /** Seconds into the current rise or sink. */
   t: number
   /** Seconds left before it escapes. */
@@ -349,8 +349,20 @@ export class Game {
 
   /** CONTINUE on the crash screen: infinite mode, the bosses keep coming. */
   continueAfterCrash(): void {
+    if (this.boss?.phase === 'die') this.boss = null
     this.state.crashPending = false
     this.revision++
+  }
+
+  /** Real time passing behind the frozen world while PIXEL ZERO dies. True once the death animation is over. */
+  advanceCrash(dt: number): boolean {
+    const b = this.boss
+    if (b?.phase !== 'die') return true
+    b.t += dt
+    if (b.t < C.FINAL_DEATH) return false
+    this.boss = null
+    this.revision++
+    return true
   }
 
   /** PIXEL ZERO arrives alone: every pixel on screen is pulled into it (no reward) and any storm stops. */
@@ -1254,10 +1266,19 @@ export class Game {
     this.revision++
   }
 
-  /** PIXEL ZERO is dead: a huge payout, then the screen crashes and the player picks REBOOT or CONTINUE. */
+  /**
+   * PIXEL ZERO is dead: a huge payout, then the screen crashes and the player picks REBOOT or CONTINUE.
+   * The world freezes at once; it stays on screen in its 'die' phase while the death animation plays.
+   */
   private defeatFinal(b: Boss): void {
-    this.boss = null
+    b.phase = 'die'
+    b.t = 0
+    b.hp = 0
     this.droneJam = 0
+    // Nothing else on screen while it dies: no beams, bombs or blasts frozen mid-air.
+    this.lasers = []
+    this.bombs = []
+    this.blasts = []
     const amount = this.stats.value * C.FINAL_REWARD_VALUE * b.tier
     this.earn(amount, true)
     this.addXp(xpToNext(this.state.level) * C.FINAL_REWARD_XP_FRAC)
@@ -1324,6 +1345,7 @@ export class Game {
       }
       return
     }
+    if (b.phase === 'die') return
     if (b.phase === 'sink') {
       b.t += dt
       if (b.t >= C.BOSS_SINK) {

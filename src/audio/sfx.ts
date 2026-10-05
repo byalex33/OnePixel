@@ -178,11 +178,9 @@ export class Sfx {
         ;[880, 1175, 1568].forEach((f, i) => this.tone('square', f, f, 0.08, 0.4, i * 0.05))
         break
       case 'final-rise':
-        // A rising roar as the arena is sucked in, over a sub-bass drone, with the signal stuttering.
-        this.swell(2.9, 0.9, 150, 7000)
-        this.tone('sine', 42, 55, 3, 1)
-        this.tone('sawtooth', 55, 110, 2.9, 0.18)
-        ;[0.35, 0.8, 1.2, 1.55, 1.9, 2.15, 2.4, 2.6].forEach((d, i) => this.tone('square', 1800 - i * 120, 300, 0.05, 0.22, d))
+        // PIXEL ZERO dials in: a dial-up modem connecting, squeezed into its rise, over a low drone.
+        this.tone('sine', 42, 55, 3, 0.7)
+        this.dialUp()
         break
       case 'final-surfaced':
         this.noise(1.8, 1.3, 2600)
@@ -190,11 +188,91 @@ export class Sfx {
         ;[131, 165, 196].forEach((f) => this.tone('square', f, f * 0.94, 1.2, 0.22))
         break
       case 'final-defeat':
-        this.noise(2.2, 1.2, 800)
-        this.tone('sine', 110, 20, 2, 1.2)
-        ;[1568, 1319, 1047, 784, 523, 392, 262].forEach((f, i) => this.tone('square', f, f * 0.97, 0.14, 0.35, 0.3 + i * 0.12))
+        // Impact, then sub-pixels cracking under a rising whine.
+        this.noise(0.5, 1.2, 3000)
+        this.tone('sine', 120, 30, 0.6, 1.2)
+        this.tone('sine', 180, 2400, 2.4, 0.22, 0.1)
+        for (let i = 0; i < 15; i++) this.noise(0.07, 0.5, 2500 + Math.random() * 3000, 0.15 + i * 0.15 + Math.random() * 0.05)
+        // Implosion into a single pixel... then the machine hangs: the audio freezes into a
+        // stuck loop (bzzzzzz) until the blue screen cuts it dead.
+        this.swell(0.55, 1, 6000, 200, 2.4)
+        this.stuck(1.0, 0.5, 3.0)
         break
     }
+  }
+
+  /**
+   * A dial-up modem connecting, in about three seconds: dial tone, the number
+   * being dialled, the answer tone, the handshake, then the screeching static.
+   */
+  private dialUp(): void {
+    const dual = (a: number, b: number, dur: number, vol: number, at: number) => {
+      this.tone('sine', a, a, dur, vol, at)
+      this.tone('sine', b, b, dur, vol, at)
+    }
+    // Dial tone.
+    dual(350, 440, 0.28, 0.35, 0)
+    // Touch-tone digits.
+    const DTMF: [number, number][] = [[852, 1209], [697, 1336], [770, 1477], [941, 1336], [697, 1209], [852, 1477], [770, 1336]]
+    DTMF.forEach(([a, b], i) => dual(a, b, 0.065, 0.3, 0.32 + i * 0.085))
+    // Answer tone, then the "beee-booo" handshake.
+    this.tone('sine', 2100, 2100, 0.32, 0.25, 0.98)
+    this.tone('square', 1650, 1650, 0.12, 0.12, 1.32)
+    this.tone('square', 980, 980, 0.12, 0.12, 1.45)
+    this.tone('square', 1650, 1650, 0.1, 0.12, 1.58)
+    // The screech: fast warbling carrier pairs over hissing static.
+    for (let i = 0; i < 40; i++) {
+      const f = [1070, 1270, 2025, 2225][i % 4] + (i % 7) * 30
+      this.tone('square', f, f, 0.03, 0.09, 1.72 + i * 0.03)
+    }
+    this.hiss(1.25, 0.35, 1900, 1.72)
+    this.hiss(0.9, 0.25, 3200, 2.05)
+  }
+
+  /** Band-passed noise around `freq`: modem static. */
+  private hiss(dur: number, vol: number, freq: number, delay = 0): void {
+    const ctx = this.ctx!
+    const t = ctx.currentTime + delay
+    const src = ctx.createBufferSource()
+    src.buffer = this.noiseBuf
+    src.loop = true
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = freq
+    filter.Q.value = 1.5
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(vol, t)
+    g.gain.setValueAtTime(vol, t + dur - 0.02)
+    g.gain.linearRampToValueAtTime(0, t + dur)
+    src.connect(filter).connect(g).connect(this.master!)
+    src.start(t)
+    src.stop(t + dur)
+  }
+
+  /**
+   * A crashed PC's frozen audio: a few hundredths of a second of sound looping
+   * forever (bzzzzzz), stopped dead with no fade.
+   */
+  private stuck(dur: number, vol: number, delay = 0): void {
+    const ctx = this.ctx!
+    const t = ctx.currentTime + delay
+    const len = Math.round(ctx.sampleRate * 0.043)
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    const square = (f: number, s: number) => (Math.sin(2 * Math.PI * f * s) > 0 ? 1 : -1)
+    for (let i = 0; i < len; i++) {
+      const s = i / ctx.sampleRate
+      // A slice of chord, the death whine and static, as if caught mid-sound.
+      d[i] = 0.6 * (0.3 * square(220, s) + 0.25 * square(277, s) + 0.2 * square(330, s) + 0.25 * Math.sin(2 * Math.PI * 1900 * s) + 0.2 * (Math.random() * 2 - 1))
+    }
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    src.loop = true
+    const g = ctx.createGain()
+    g.gain.value = vol
+    src.connect(g).connect(this.master!)
+    src.start(t)
+    src.stop(t + dur)
   }
 
   private tone(type: OscillatorType, from: number, to: number, dur: number, vol: number, delay = 0): void {
@@ -213,9 +291,9 @@ export class Sfx {
   }
 
   /** Filtered noise that swells in and opens up from `from` Hz to `to` Hz, then cuts off. */
-  private swell(dur: number, vol: number, from: number, to: number): void {
+  private swell(dur: number, vol: number, from: number, to: number, delay = 0): void {
     const ctx = this.ctx!
-    const t = ctx.currentTime
+    const t = ctx.currentTime + delay
     const src = ctx.createBufferSource()
     src.buffer = this.noiseBuf
     src.loop = true
@@ -232,9 +310,9 @@ export class Sfx {
     src.stop(t + dur)
   }
 
-  private noise(dur: number, vol: number, cutoff: number): void {
+  private noise(dur: number, vol: number, cutoff: number, delay = 0): void {
     const ctx = this.ctx!
-    const t = ctx.currentTime
+    const t = ctx.currentTime + delay
     const src = ctx.createBufferSource()
     src.buffer = this.noiseBuf
     const filter = ctx.createBiquadFilter()

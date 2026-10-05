@@ -30,8 +30,8 @@ const choice = 'w-full border-2 border-white px-3 py-3 text-left hover:bg-white 
  */
 export function CrashScreen() {
   const rt = useRuntime()
-  // Mounted fresh for each crash, so the progress counter always starts from 0%.
-  return rt.game.state.crashPending ? <Crash /> : null
+  // Waits for PIXEL ZERO's death animation, then mounts fresh so the counter always starts from 0%.
+  return rt.game.state.crashPending && rt.game.boss?.phase !== 'die' ? <Crash /> : null
 }
 
 function Crash() {

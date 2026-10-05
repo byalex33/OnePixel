@@ -140,7 +140,10 @@ export class Runtime {
     this.last = now
 
     // The world freezes behind the crash screen until the player chooses.
-    this.acc = this.game.state.crashPending ? 0 : this.acc + dt
+    const crashed = this.game.state.crashPending
+    if (crashed) this.game.advanceCrash(dt)
+    this.music.setSilenced(crashed)
+    this.acc = crashed ? 0 : this.acc + dt
     let steps = 0
     while (this.acc >= DT && steps < MAX_STEPS_PER_FRAME) {
       this.game.tick(DT)
