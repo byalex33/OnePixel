@@ -281,6 +281,14 @@ Hosted on Vercel, configured in `vercel.json` (Vite build, output `dist`).
 - **Deploy:** `vercel --prod`, or push to `main` once the GitHub repo is connected in the Vercel dashboard.
 - **Caching:** hashed files under `/assets` are cached for a year as immutable; `index.html` uses Vercel's default revalidation, so a new deploy shows up immediately.
 
+### itch.io
+
+`npm run itch` builds and writes `release/onepixel-web-<version>.zip` with `index.html` at the root. Upload it on the itch.io project page as an HTML file and tick "This file will be played in the browser".
+
+- The build uses relative URLs (`base: './'` in `vite.config.ts`) because itch.io serves games from a subpath, and fonts are bundled through Fontsource, so nothing is loaded from other hosts.
+- Suggested embed settings: 1280 x 800 viewport, "Mobile friendly", and the fullscreen button on.
+- Saves use `localStorage` on itch.io's shared game domain under the `onepixel.save` key, so they don't carry over from the Vercel site.
+
 ## Roadmap
 
 - More of the late game beyond level 20 (something is stirring beneath the grid)
