@@ -101,6 +101,8 @@ export interface SaveState {
   bossTimeLeft: number
   /** The fight that was saved mid-way has already taken its nuke hit. */
   bossNuked: boolean
+  /** stats.bossKills when PIXEL ZERO last died. The next one is due FINAL_EVERY regular kills later. */
+  lastFinalAt: number
   seenUpgrades: UpgradeId[]
   reveal: { hud: boolean; panel: boolean }
   settings: Settings

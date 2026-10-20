@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS } from './achievements'
-import { BOSS_FIGHT_TIME, BOSS_INTERVAL, FINAL_FIGHT_TIME, SAVE_KEY, SAVE_VERSION } from './config'
+import { BOSS_FIGHT_TIME, BOSS_INTERVAL, FINAL_EVERY, FINAL_FIGHT_TIME, SAVE_KEY, SAVE_VERSION } from './config'
 import { createInitialState } from './state'
 import type { SaveState, UpgradeId } from './types'
 import { UPGRADE_MAP } from './upgrades'
@@ -62,6 +62,9 @@ export function sanitizeState(raw: unknown): SaveState {
   if (isObj(raw.stats)) {
     for (const k of Object.keys(out.stats) as (keyof typeof out.stats)[]) out.stats[k] = num(raw.stats[k], 0)
   }
+  // Older saves don't have it: assume each PIXEL ZERO came on schedule, every FINAL_EVERY regular kills.
+  const kills = out.stats.bossKills
+  out.lastFinalAt = num(raw.lastFinalAt, Math.min(kills, FINAL_EVERY * out.stats.finalKills), 0, kills)
   const known = new Set(ACHIEVEMENTS.map((a) => a.id))
   if (Array.isArray(raw.achievements)) {
     out.achievements = [...new Set(raw.achievements.filter((a): a is string => typeof a === 'string' && known.has(a)))]

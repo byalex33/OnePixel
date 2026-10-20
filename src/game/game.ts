@@ -336,10 +336,9 @@ export class Game {
     }
   }
 
-  /** The next boss to surface is PIXEL ZERO: after every FINAL_EVERY regular kills. */
+  /** The next boss to surface is PIXEL ZERO: FINAL_EVERY regular kills after the last one. */
   get finalDue(): boolean {
-    const st = this.state.stats
-    return st.bossKills >= C.FINAL_EVERY * (st.finalKills + 1)
+    return this.state.stats.bossKills - this.state.lastFinalAt >= C.FINAL_EVERY
   }
 
   /** While PIXEL ZERO is up nothing else spawns: it is just the player and the boss. */
@@ -1295,6 +1294,7 @@ export class Game {
     this.earn(amount, true)
     this.addXp(xpToNext(this.state.level) * C.FINAL_REWARD_XP_FRAC)
     this.state.stats.finalKills++
+    this.state.lastFinalAt = this.state.stats.bossKills
     this.state.bossTimer = C.BOSS_INTERVAL
     this.state.bossHealth = 1
     this.clearSavedFight()

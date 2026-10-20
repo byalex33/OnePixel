@@ -51,6 +51,7 @@ export function createInitialState(): SaveState {
     bossHealth: 1,
     bossTimeLeft: 0,
     bossNuked: false,
+    lastFinalAt: 0,
     seenUpgrades: [],
     reveal: { hud: false, panel: false },
     settings: { sound: true, music: true, autoNuke: true, shake: true, haptics: true },

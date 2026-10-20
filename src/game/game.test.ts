@@ -925,6 +925,26 @@ describe('PIXEL ZERO, the final boss', () => {
     expect(g.state.crashPending).toBe(false)
   })
 
+  it('a save with more than ten regular kills gets one PIXEL ZERO, then five regular bosses', () => {
+    const { g, b } = finalFight((s) => (s.stats.bossKills = 12))
+    expect(b.final).toBe(true)
+    expect(b.tier).toBe(1)
+    b.hp = 1
+    g.pointerDown(b.x, b.y)
+    g.advanceCrash(C.FINAL_DEATH)
+    g.continueAfterCrash()
+    expect(g.finalDue).toBe(false)
+    for (let i = 0; i < C.FINAL_EVERY; i++) {
+      const next = g.spawnBoss()
+      expect(next.final).toBe(false)
+      expect(next.tier).toBe(13 + i)
+      g.boss = null
+      g.state.stats.bossKills++
+    }
+    expect(g.finalDue).toBe(true)
+    expect(g.spawnBoss().tier).toBe(2)
+  })
+
   it('awards SYSTEM CRASH at once, so a REBOOT straight from the crash screen keeps it', () => {
     const { g, b } = finalFight()
     b.hp = 1
