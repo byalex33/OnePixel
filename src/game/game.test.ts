@@ -4,6 +4,7 @@ import * as F from './formulas'
 import { xpToNext } from './formulas'
 import { Game, type Boss, type Pixel } from './game'
 import { rebootState } from './prestige'
+import { makeSaveFile, parseSaveFile } from './save'
 import { createInitialState } from './state'
 import type { GameEvent, SaveState } from './types'
 import { costOf, isUnlocked, maxPurchase, UPGRADE_MAP } from './upgrades'
@@ -791,6 +792,28 @@ describe('the boss', () => {
     expect(events.some((e) => e.type === 'boss-rise')).toBe(true)
   })
 
+  it('reloading mid-fight keeps its wounds, its clock and its nuke hit', () => {
+    const { g, b } = fight()
+    b.hp = Math.round(b.maxHp / 3)
+    b.timeLeft = 37
+    b.nuked = true
+    const file = parseSaveFile(JSON.parse(JSON.stringify(makeSaveFile(g.saveState(), 0))))
+    const reloaded = new Game(file.state, 2)
+    reloaded.resize(240, 160)
+    run(reloaded, C.BOSS_RISE + 2 * C.DT)
+    const back = reloaded.boss
+    expect(back?.phase).toBe('fight')
+    expect(back?.hp).toBeCloseTo(b.hp, 0)
+    expect(back?.timeLeft).toBeCloseTo(37, 1)
+    expect(back?.nuked).toBe(true)
+
+    // Once the fight ends, the next boss gets a fresh clock.
+    back!.timeLeft = 0.01
+    run(reloaded, 0.05)
+    expect(reloaded.state.bossTimeLeft).toBe(0)
+    expect(reloaded.state.bossNuked).toBe(false)
+  })
+
   it('moves with the arena when it is resized', () => {
     const { g, b } = fight()
     g.resize(480, 80)
@@ -902,6 +925,88 @@ describe('PIXEL ZERO, the final boss', () => {
     expect(g.state.crashPending).toBe(false)
   })
 
+  it('a save with more than ten regular kills gets one PIXEL ZERO, then five regular bosses', () => {
+    const { g, b } = finalFight((s) => (s.stats.bossKills = 12))
+    expect(b.final).toBe(true)
+    expect(b.tier).toBe(1)
+    b.hp = 1
+    g.pointerDown(b.x, b.y)
+    g.advanceCrash(C.FINAL_DEATH)
+    g.continueAfterCrash()
+    expect(g.finalDue).toBe(false)
+    for (let i = 0; i < C.FINAL_EVERY; i++) {
+      const next = g.spawnBoss()
+      expect(next.final).toBe(false)
+      expect(next.tier).toBe(13 + i)
+      g.boss = null
+      g.state.stats.bossKills++
+    }
+    expect(g.finalDue).toBe(true)
+    expect(g.spawnBoss().tier).toBe(2)
+  })
+
+  it('AUTO holds a charged nuke for PIXEL ZERO and fires it once the fight starts', () => {
+    const g = makeGame((s) => {
+      s.level = 20
+      s.stats.bossKills = C.FINAL_EVERY
+      s.bossTimer = 1
+      s.upgrades.nukeCharge = UPGRADE_MAP.nukeCharge.max
+      s.settings.autoNuke = true
+    })
+    g.state.nukeCharge = g.stats.nukeKills
+    expect(g.holdNukeForFinal).toBe(true)
+    run(g, 0.5)
+    expect(g.nuke).toBeNull()
+    expect(g.state.nukeCharge).toBe(g.stats.nukeKills)
+
+    run(g, 0.6) // it surfaces, but a nuke during the rise would miss it
+    const b = g.boss!
+    expect(b.final).toBe(true)
+    expect(b.phase).toBe('rise')
+    expect(g.nuke).toBeNull()
+
+    run(g, C.FINAL_RISE + C.NUKE_WARMUP + 0.1)
+    expect(b.phase).toBe('fight')
+    expect(b.nuked).toBe(true)
+    expect(b.hp).toBeLessThanOrEqual(b.maxHp * (1 - C.FINAL_NUKE_FRACTION) + 1)
+  })
+
+  it('pays no offline progress behind the crash screen or during its lockdown', () => {
+    const drones = (s: SaveState) => {
+      s.level = 20
+      s.upgrades.auto = 3
+    }
+    const away = (g: Game) => {
+      const before = [g.state.pixels, g.state.xp]
+      const gains = g.collectOffline(2 * 3600)
+      return { gains, paid: g.state.pixels !== before[0] || g.state.xp !== before[1] }
+    }
+    expect(away(makeGame(drones)).paid).toBe(true)
+
+    const crashed = away(makeGame((s) => {
+      drones(s)
+      s.crashPending = true
+    }))
+    expect(crashed).toEqual({ gains: null, paid: false })
+
+    const { g } = finalFight(drones)
+    expect(away(g)).toEqual({ gains: null, paid: false })
+
+    // Reloaded from a save made mid-fight, before PIXEL ZERO has come back up.
+    const reloaded = new Game(structuredClone(g.saveState()), 2)
+    expect(reloaded.boss).toBeNull()
+    expect(away(reloaded)).toEqual({ gains: null, paid: false })
+  })
+
+  it('awards SYSTEM CRASH at once, so a REBOOT straight from the crash screen keeps it', () => {
+    const { g, b } = finalFight()
+    b.hp = 1
+    g.pointerDown(b.x, b.y)
+    expect(g.state.achievements).toContain('final')
+    expect(g.drainEvents().some((e) => e.type === 'achievement' && e.id === 'final')).toBe(true)
+    expect(rebootState(g.state).achievements).toContain('final')
+  })
+
   it('REBOOT starts over harder but richer, keeping feats and settings', () => {
     const { g } = finalFight()
     g.state.achievements = ['first', 'boss']
@@ -914,5 +1019,17 @@ describe('PIXEL ZERO, the final boss', () => {
     const fresh = createInitialState()
     fresh.achievements = next.achievements
     expect(F.computeStats(next).value).toBeCloseTo(F.computeStats(fresh).value * C.REBOOT_VALUE_MULT)
+  })
+
+  it('REBOOT keeps the lifetime EARNED total but not the pixels in the bank', () => {
+    const { g } = finalFight((s) => {
+      s.pixels = 5e9
+      s.totalPixels = 9.4e11
+      s.stats.kills = 1234
+    })
+    const next = rebootState(g.state)
+    expect(next.pixels).toBe(0)
+    expect(next.totalPixels).toBe(9.4e11)
+    expect(next.stats.kills).toBe(1234)
   })
 })

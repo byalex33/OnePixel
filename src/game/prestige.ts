@@ -9,6 +9,7 @@ import type { SaveState } from './types'
 export function rebootState(prev: SaveState): SaveState {
   const s = createInitialState()
   s.reboots = prev.reboots + 1
+  s.totalPixels = prev.totalPixels
   s.achievements = [...prev.achievements]
   s.settings = { ...prev.settings }
   s.stats = { ...prev.stats, bossKills: 0, bossEscapes: 0, finalKills: 0 }
