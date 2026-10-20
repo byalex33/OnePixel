@@ -1288,6 +1288,8 @@ export class Game {
     this.state.crashPending = true
     this.refreshStats()
     this.emit({ type: 'final-defeat', x: b.x, y: b.y, amount })
+    // Nothing ticks behind the crash screen, so award SYSTEM CRASH now or a REBOOT would skip it.
+    this.checkAchievements()
     this.revision++
   }
 

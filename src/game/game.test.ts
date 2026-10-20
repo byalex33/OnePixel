@@ -902,6 +902,15 @@ describe('PIXEL ZERO, the final boss', () => {
     expect(g.state.crashPending).toBe(false)
   })
 
+  it('awards SYSTEM CRASH at once, so a REBOOT straight from the crash screen keeps it', () => {
+    const { g, b } = finalFight()
+    b.hp = 1
+    g.pointerDown(b.x, b.y)
+    expect(g.state.achievements).toContain('final')
+    expect(g.drainEvents().some((e) => e.type === 'achievement' && e.id === 'final')).toBe(true)
+    expect(rebootState(g.state).achievements).toContain('final')
+  })
+
   it('REBOOT starts over harder but richer, keeping feats and settings', () => {
     const { g } = finalFight()
     g.state.achievements = ['first', 'boss']
