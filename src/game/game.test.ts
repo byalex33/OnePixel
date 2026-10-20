@@ -971,6 +971,33 @@ describe('PIXEL ZERO, the final boss', () => {
     expect(b.hp).toBeLessThanOrEqual(b.maxHp * (1 - C.FINAL_NUKE_FRACTION) + 1)
   })
 
+  it('pays no offline progress behind the crash screen or during its lockdown', () => {
+    const drones = (s: SaveState) => {
+      s.level = 20
+      s.upgrades.auto = 3
+    }
+    const away = (g: Game) => {
+      const before = [g.state.pixels, g.state.xp]
+      const gains = g.collectOffline(2 * 3600)
+      return { gains, paid: g.state.pixels !== before[0] || g.state.xp !== before[1] }
+    }
+    expect(away(makeGame(drones)).paid).toBe(true)
+
+    const crashed = away(makeGame((s) => {
+      drones(s)
+      s.crashPending = true
+    }))
+    expect(crashed).toEqual({ gains: null, paid: false })
+
+    const { g } = finalFight(drones)
+    expect(away(g)).toEqual({ gains: null, paid: false })
+
+    // Reloaded from a save made mid-fight, before PIXEL ZERO has come back up.
+    const reloaded = new Game(structuredClone(g.saveState()), 2)
+    expect(reloaded.boss).toBeNull()
+    expect(away(reloaded)).toEqual({ gains: null, paid: false })
+  })
+
   it('awards SYSTEM CRASH at once, so a REBOOT straight from the crash screen keeps it', () => {
     const { g, b } = finalFight()
     b.hp = 1

@@ -2,7 +2,7 @@ import { Music } from '../audio/music'
 import { Sfx } from '../audio/sfx'
 import { AUTOSAVE_SECONDS, DT, MIN_OFFLINE_SECONDS, MAX_OFFLINE_SECONDS } from '../game/config'
 import { Game, type Rect } from '../game/game'
-import { offlineGains, offlineSeconds, type OfflineGains } from '../game/offline'
+import { offlineSeconds, type OfflineGains } from '../game/offline'
 import { exportSave, importSave, loadFrom, makeSaveFile, writeTo, type KeyValueStore } from '../game/save'
 import { SAVE_KEY } from '../game/config'
 import type { GameEvent, Settings, UpgradeId } from '../game/types'
@@ -243,9 +243,8 @@ export class Runtime {
 
   private applyOffline(seconds: number): void {
     const before = this.game.state.level
-    const gains = offlineGains(this.game.state, seconds)
-    if (gains.kills <= 0) return
-    this.game.grant(gains.pixels, gains.xp)
+    const gains = this.game.collectOffline(seconds)
+    if (!gains) return
     this.game.drainEvents() // level-ups are summarised in the modal instead
     this.notices = [...this.notices, { id: this.noticeId++, kind: 'offline', gains, levels: this.game.state.level - before }]
     this.bump()

@@ -2,6 +2,7 @@ import * as C from './config'
 import { ACHIEVEMENTS } from './achievements'
 import { bossMaxHp, comboMult, computeStats, finalMaxHp, rebootBossHpMult, xpToNext, type Stats } from './formulas'
 import { hasFeature } from './levels'
+import { offlineGains, type OfflineGains } from './offline'
 import { Rng } from './rng'
 import { createInitialState } from './state'
 import type { BossDamageSource, Cause, GameEvent, PixelKind, SaveState, UpgradeId } from './types'
@@ -480,6 +481,24 @@ export class Game {
       this.state.bossNuked = b.nuked
     }
     return this.state
+  }
+
+  /**
+   * Time away: nothing moves behind the crash screen, and PIXEL ZERO's lockdown means machines kill nothing,
+   * so neither pays. Otherwise pays the automation rate. Returns what was paid, or null for nothing.
+   */
+  collectOffline(seconds: number): OfflineGains | null {
+    if (this.offlineFrozen) return null
+    const gains = offlineGains(this.state, seconds)
+    if (gains.kills <= 0) return null
+    this.grant(gains.pixels, gains.xp)
+    return gains
+  }
+
+  private get offlineFrozen(): boolean {
+    if (this.state.crashPending || this.lockdown) return true
+    // Just loaded from a save made mid-fight: PIXEL ZERO comes straight back on the first tick.
+    return this.boss === null && this.state.bossTimer <= 0 && this.finalDue && hasFeature(this.state.level, 'boss')
   }
 
   /** Award pixels/xp computed by offline progress. */
