@@ -310,7 +310,7 @@ export class Runtime {
   // ------------------------------------------------------------------ saves
 
   save(): boolean {
-    const file = makeSaveFile(this.game.state, Date.now(), this.maxSeenAt)
+    const file = makeSaveFile(this.game.saveState(), Date.now(), this.maxSeenAt)
     this.maxSeenAt = file.maxSeenAt
     return this.store ? writeTo(this.store, file) : false
   }
@@ -321,7 +321,7 @@ export class Runtime {
 
   exportCode(): string {
     this.save()
-    return exportSave(makeSaveFile(this.game.state, Date.now(), this.maxSeenAt))
+    return exportSave(makeSaveFile(this.game.saveState(), Date.now(), this.maxSeenAt))
   }
 
   /** Throws SaveError on bad input. Imported timestamps are ignored. */

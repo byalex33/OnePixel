@@ -97,6 +97,10 @@ export interface SaveState {
   bossTimer: number
   /** Fraction of max HP the next boss surfaces with. Below 1 after one escapes wounded. */
   bossHealth: number
+  /** Seconds left on a fight that was saved mid-way, or 0 for a fresh fight. */
+  bossTimeLeft: number
+  /** The fight that was saved mid-way has already taken its nuke hit. */
+  bossNuked: boolean
   seenUpgrades: UpgradeId[]
   reveal: { hud: boolean; panel: boolean }
   settings: Settings

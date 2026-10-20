@@ -404,17 +404,17 @@ export class Game {
       tier,
       phase: 'rise',
       t: 0,
-      timeLeft: final ? C.FINAL_FIGHT_TIME : C.BOSS_FIGHT_TIME,
+      timeLeft: this.state.bossTimeLeft > 0 ? this.state.bossTimeLeft : final ? C.FINAL_FIGHT_TIME : C.BOSS_FIGHT_TIME,
       eatTimer: C.BOSS_EAT_INTERVAL,
       enraged: hp <= maxHp * C.BOSS_ENRAGE_AT,
-      nuked: false,
+      nuked: this.state.bossNuked,
       final,
       spots: final ? Array.from({ length: C.FINAL_SPOTS }, () => this.randomSpot(r)) : [],
       spotTimer: C.FINAL_SPOT_MOVE,
       empTimer: C.FINAL_EMP_INTERVAL,
       empCharge: 0,
     }
-    // Held at 0 while the boss is up, so reloading mid-fight brings it straight back.
+    // Held at 0 while the boss is up, so reloading mid-fight brings it straight back (see saveState).
     this.state.bossTimer = 0
     this.emit({ type: 'boss-rise', x: pos.x, y: pos.y, tier, final })
     if (final) this.clearArenaFor(pos)
@@ -460,6 +460,17 @@ export class Game {
       this.achTimer = 0.5
       this.checkAchievements()
     }
+  }
+
+  /** The state to persist. A boss mid-fight writes down its wounds and clock, so a reload resumes the same fight. */
+  saveState(): SaveState {
+    const b = this.fightingBoss()
+    if (b) {
+      this.state.bossHealth = b.hp / b.maxHp
+      this.state.bossTimeLeft = b.timeLeft
+      this.state.bossNuked = b.nuked
+    }
+    return this.state
   }
 
   /** Award pixels/xp computed by offline progress. */
@@ -1251,6 +1262,7 @@ export class Game {
     this.state.stats.bossKills++
     this.state.bossTimer = C.BOSS_INTERVAL
     this.state.bossHealth = 1
+    this.clearSavedFight()
     this.refreshStats()
     // It bursts into golden loot. Drones leave golden pixels alone, so it is all yours.
     const n = Math.min(C.BOSS_LOOT_MAX, C.BOSS_LOOT_BASE + C.BOSS_LOOT_PER_TIER * b.tier)
@@ -1285,6 +1297,7 @@ export class Game {
     this.state.stats.finalKills++
     this.state.bossTimer = C.BOSS_INTERVAL
     this.state.bossHealth = 1
+    this.clearSavedFight()
     this.state.crashPending = true
     this.refreshStats()
     this.emit({ type: 'final-defeat', x: b.x, y: b.y, amount })
@@ -1318,6 +1331,12 @@ export class Game {
     }
   }
 
+  /** The fight is over: the next boss gets a full clock and its own nuke hit. */
+  private clearSavedFight(): void {
+    this.state.bossTimeLeft = 0
+    this.state.bossNuked = false
+  }
+
   private escapeBoss(b: Boss): void {
     b.phase = 'sink'
     b.t = 0
@@ -1325,6 +1344,7 @@ export class Game {
     this.state.bossTimer = C.BOSS_INTERVAL
     // It keeps its wounds, so a tough tier becomes a siege rather than a wall.
     this.state.bossHealth = Math.min(1, b.hp / b.maxHp + (b.final ? C.FINAL_ESCAPE_RECOVER : C.BOSS_ESCAPE_RECOVER))
+    this.clearSavedFight()
     this.emit({ type: 'boss-escape', x: b.x, y: b.y })
     this.revision++
   }

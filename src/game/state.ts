@@ -49,6 +49,8 @@ export function createInitialState(): SaveState {
     rainTimer: rainInterval(0) * 0.4,
     bossTimer: BOSS_FIRST_DELAY,
     bossHealth: 1,
+    bossTimeLeft: 0,
+    bossNuked: false,
     seenUpgrades: [],
     reveal: { hud: false, panel: false },
     settings: { sound: true, music: true, autoNuke: true, shake: true, haptics: true },

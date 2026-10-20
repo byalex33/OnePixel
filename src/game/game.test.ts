@@ -4,6 +4,7 @@ import * as F from './formulas'
 import { xpToNext } from './formulas'
 import { Game, type Boss, type Pixel } from './game'
 import { rebootState } from './prestige'
+import { makeSaveFile, parseSaveFile } from './save'
 import { createInitialState } from './state'
 import type { GameEvent, SaveState } from './types'
 import { costOf, isUnlocked, maxPurchase, UPGRADE_MAP } from './upgrades'
@@ -789,6 +790,28 @@ describe('the boss', () => {
     reloaded.resize(240, 160)
     const events = run(reloaded, 0.05)
     expect(events.some((e) => e.type === 'boss-rise')).toBe(true)
+  })
+
+  it('reloading mid-fight keeps its wounds, its clock and its nuke hit', () => {
+    const { g, b } = fight()
+    b.hp = Math.round(b.maxHp / 3)
+    b.timeLeft = 37
+    b.nuked = true
+    const file = parseSaveFile(JSON.parse(JSON.stringify(makeSaveFile(g.saveState(), 0))))
+    const reloaded = new Game(file.state, 2)
+    reloaded.resize(240, 160)
+    run(reloaded, C.BOSS_RISE + 2 * C.DT)
+    const back = reloaded.boss
+    expect(back?.phase).toBe('fight')
+    expect(back?.hp).toBeCloseTo(b.hp, 0)
+    expect(back?.timeLeft).toBeCloseTo(37, 1)
+    expect(back?.nuked).toBe(true)
+
+    // Once the fight ends, the next boss gets a fresh clock.
+    back!.timeLeft = 0.01
+    run(reloaded, 0.05)
+    expect(reloaded.state.bossTimeLeft).toBe(0)
+    expect(reloaded.state.bossNuked).toBe(false)
   })
 
   it('moves with the arena when it is resized', () => {

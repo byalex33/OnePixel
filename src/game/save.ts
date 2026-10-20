@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS } from './achievements'
-import { BOSS_INTERVAL, SAVE_KEY, SAVE_VERSION } from './config'
+import { BOSS_FIGHT_TIME, BOSS_INTERVAL, FINAL_FIGHT_TIME, SAVE_KEY, SAVE_VERSION } from './config'
 import { createInitialState } from './state'
 import type { SaveState, UpgradeId } from './types'
 import { UPGRADE_MAP } from './upgrades'
@@ -49,6 +49,8 @@ export function sanitizeState(raw: unknown): SaveState {
   out.rainTimer = num(raw.rainTimer, base.rainTimer, 0, 3600)
   out.bossTimer = num(raw.bossTimer, base.bossTimer, 0, BOSS_INTERVAL)
   out.bossHealth = num(raw.bossHealth, 1, 0.05, 1)
+  out.bossTimeLeft = num(raw.bossTimeLeft, 0, 0, Math.max(BOSS_FIGHT_TIME, FINAL_FIGHT_TIME))
+  out.bossNuked = bool(raw.bossNuked, false)
   out.reboots = Math.floor(num(raw.reboots, 0, 0, 999))
   out.crashPending = bool(raw.crashPending, false)
 
