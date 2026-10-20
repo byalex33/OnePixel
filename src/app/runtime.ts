@@ -6,13 +6,14 @@ import { offlineSeconds, type OfflineGains } from '../game/offline'
 import { exportSave, importSave, loadFrom, makeSaveFile, writeTo, type KeyValueStore } from '../game/save'
 import { SAVE_KEY } from '../game/config'
 import type { GameEvent, Settings, UpgradeId } from '../game/types'
+import { unlocksBetween, type LevelDef } from '../game/levels'
 import { rebootState } from '../game/prestige'
 import { Renderer } from '../render/renderer'
 
 export type Notice =
   | { id: number; kind: 'levelup'; level: number }
   | { id: number; kind: 'achievement'; achId: string }
-  | { id: number; kind: 'offline'; gains: OfflineGains; levels: number }
+  | { id: number; kind: 'offline'; gains: OfflineGains; levels: number; unlocks: LevelDef[] }
 
 const MAX_STEPS_PER_FRAME = 15
 const UI_INTERVAL = 0.1
@@ -246,7 +247,8 @@ export class Runtime {
     const gains = this.game.collectOffline(seconds)
     if (!gains) return
     this.game.drainEvents() // level-ups are summarised in the modal instead
-    this.notices = [...this.notices, { id: this.noticeId++, kind: 'offline', gains, levels: this.game.state.level - before }]
+    const after = this.game.state.level
+    this.notices = [...this.notices, { id: this.noticeId++, kind: 'offline', gains, levels: after - before, unlocks: unlocksBetween(before, after) }]
     this.bump()
   }
 

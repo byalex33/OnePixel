@@ -3,6 +3,7 @@ import * as C from './config'
 import * as F from './formulas'
 import { xpToNext } from './formulas'
 import { Game, type Boss, type Pixel } from './game'
+import { unlocksBetween } from './levels'
 import { rebootState } from './prestige'
 import { makeSaveFile, parseSaveFile } from './save'
 import { createInitialState } from './state'
@@ -609,6 +610,23 @@ describe('the boss', () => {
     expect(events.some((e) => e.type === 'boss-rise')).toBe(false)
   })
 
+  it('forecasts the next boss for the HUD: when, how wounded, and how far to PIXEL ZERO', () => {
+    expect(makeGame((s) => (s.level = 19)).nextBoss).toBeNull()
+    const g = makeGame((s) => {
+      s.level = 20
+      s.bossTimer = 42
+      s.bossHealth = 0.6
+      s.stats.bossKills = 3
+    })
+    expect(g.nextBoss).toEqual({ final: false, seconds: 42, health: 0.6, killsToFinal: 2 })
+    g.state.stats.bossKills = 5
+    expect(g.nextBoss).toMatchObject({ final: true, killsToFinal: 0 })
+    g.state.stats.finalKills = 1
+    expect(g.nextBoss).toMatchObject({ final: false, killsToFinal: 5 })
+    g.spawnBoss()
+    expect(g.nextBoss).toBeNull()
+  })
+
   it('surfaces shortly after reaching level 20, then joins the fight', () => {
     const g = makeGame((s) => (s.level = 20))
     const events = run(g, C.BOSS_FIRST_DELAY + 0.1)
@@ -773,7 +791,7 @@ describe('the boss', () => {
     g.pointerDown(120, 80)
     expect(b.hp).toBeCloseTo(b.maxHp * 0.4) // can't be hurt on the way down
     expect(g.state.stats.bossEscapes).toBe(1)
-    expect(g.state.bossTimer).toBe(C.BOSS_INTERVAL)
+    expect(g.state.bossTimer).toBe(C.BOSS_RETRY_INTERVAL)
     expect(g.state.bossHealth).toBeCloseTo(0.4 + C.BOSS_ESCAPE_RECOVER)
     run(g, C.BOSS_SINK)
     expect(g.boss).toBeNull()
@@ -1031,5 +1049,13 @@ describe('PIXEL ZERO, the final boss', () => {
     expect(next.pixels).toBe(0)
     expect(next.totalPixels).toBe(9.4e11)
     expect(next.stats.kills).toBe(1234)
+  })
+})
+
+describe('unlocks gained while away', () => {
+  it('lists every unlock past the old level, up to the new one', () => {
+    expect(unlocksBetween(16, 20).map((l) => l.title)).toEqual(['RAINBOW MODE', 'OVERCLOCK', 'SIGNAL'])
+    expect(unlocksBetween(18, 19)).toEqual([])
+    expect(unlocksBetween(20, 20)).toEqual([])
   })
 })
