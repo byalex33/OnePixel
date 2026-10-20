@@ -153,6 +153,27 @@ export function NukeControl() {
   )
 }
 
+/** Between fights: when the next boss surfaces, how wounded it is, and how far off PIXEL ZERO is. */
+export function BossStatus() {
+  const rt = useRuntime()
+  const next = rt.game.nextBoss
+  if (!next) return null
+  const shadow = { textShadow: '2px 2px 0 #000' }
+  return (
+    <div className="font-pixel text-[8px] leading-relaxed text-dim" style={shadow}>
+      <div>
+        <span className={next.final ? 'text-cyan' : 'text-red'}>{next.final ? FINAL_NAME : BOSS_NAME}</span> IN {fmtTime(next.seconds)}
+        {next.health < 1 && <span className="text-ink"> {Math.round(next.health * 100)}% HP</span>}
+      </div>
+      {!next.final && (
+        <div>
+          <span className="text-cyan">{FINAL_NAME}</span> AFTER {next.killsToFinal} MORE {next.killsToFinal === 1 ? 'KILL' : 'KILLS'}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function StormStatus() {
   const rt = useRuntime()
   const g = rt.game

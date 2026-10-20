@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { GiTrophy } from 'react-icons/gi'
 import type { Notice } from '../app/runtime'
 import { ACHIEVEMENTS } from '../game/achievements'
-import { MAX_OFFLINE_SECONDS, OFFLINE_EFFICIENCY } from '../game/config'
+import { BOSS_NAME, MAX_OFFLINE_SECONDS, OFFLINE_EFFICIENCY } from '../game/config'
 import { fmt, fmtTime } from '../game/format'
 import { levelDef } from '../game/levels'
 import { useRuntime } from './hooks'
@@ -108,6 +108,20 @@ export function OfflineModal() {
             </div>
           )}
         </div>
+        {n.unlocks.length > 0 && (
+          <div className="mt-4 border-t-2 border-line pt-3">
+            <div className="font-pixel text-[8px] text-gold">UNLOCKED WHILE AWAY</div>
+            <ul className="mt-2 space-y-1.5">
+              {n.unlocks.map((u) => (
+                <li key={u.level} className="flex justify-between gap-2 font-pixel text-[9px]">
+                  <span className="text-hi">{u.feature === 'boss' ? `${BOSS_NAME} BOSS` : u.title}</span>
+                  <span className="text-dim">LV {u.level}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2 text-[16px] leading-tight text-dim">New upgrades are marked NEW in the shop.</div>
+          </div>
+        )}
         <div className="mt-4 text-[16px] leading-tight text-mute">
           Offline runs at {Math.round(OFFLINE_EFFICIENCY * 100)}% automation speed, up to {MAX_OFFLINE_SECONDS / 3600}h.
         </div>

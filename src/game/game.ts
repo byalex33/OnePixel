@@ -342,6 +342,18 @@ export class Game {
     return st.bossKills >= C.FINAL_EVERY * (st.finalKills + 1)
   }
 
+  /** What surfaces next and when, for the HUD. Null before bosses unlock or while one is up. */
+  get nextBoss(): { final: boolean; seconds: number; health: number; killsToFinal: number } | null {
+    if (this.boss || !hasFeature(this.state.level, 'boss')) return null
+    const st = this.state.stats
+    return {
+      final: this.finalDue,
+      seconds: this.state.bossTimer,
+      health: this.state.bossHealth,
+      killsToFinal: Math.max(0, C.FINAL_EVERY * (st.finalKills + 1) - st.bossKills),
+    }
+  }
+
   /** While PIXEL ZERO is up nothing else spawns: it is just the player and the boss. */
   get lockdown(): boolean {
     return this.boss?.final === true
