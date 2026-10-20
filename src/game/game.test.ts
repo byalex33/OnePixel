@@ -924,4 +924,16 @@ describe('PIXEL ZERO, the final boss', () => {
     fresh.achievements = next.achievements
     expect(F.computeStats(next).value).toBeCloseTo(F.computeStats(fresh).value * C.REBOOT_VALUE_MULT)
   })
+
+  it('REBOOT keeps the lifetime EARNED total but not the pixels in the bank', () => {
+    const { g } = finalFight((s) => {
+      s.pixels = 5e9
+      s.totalPixels = 9.4e11
+      s.stats.kills = 1234
+    })
+    const next = rebootState(g.state)
+    expect(next.pixels).toBe(0)
+    expect(next.totalPixels).toBe(9.4e11)
+    expect(next.stats.kills).toBe(1234)
+  })
 })
