@@ -1261,6 +1261,12 @@ export class Renderer {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.lineJoin = 'round'
+    // Keep the whole label on screen: numbers from pixels near an edge would otherwise be cut off.
+    const pad = 4
+    const inside = (x: number, width: number) => {
+      const half = width / 2
+      return this.cssW < width + 2 * pad ? this.cssW / 2 : Math.max(pad + half, Math.min(this.cssW - pad - half, x))
+    }
     for (const t of this.texts) {
       const p = t.t / t.dur
       const pop = p < 0.12 ? 0.6 + (p / 0.12) * 0.6 : p < 0.2 ? 1.2 - ((p - 0.12) / 0.08) * 0.2 : 1
@@ -1270,11 +1276,11 @@ export class Renderer {
       ctx.font = `${size}px ${FONT}`
       ctx.lineWidth = 4
       ctx.strokeStyle = PAL.bg
-      const x = Math.round(t.x)
       const y = Math.round(t.y - rise)
       if (t.sprite) {
         const { art, colors } = t.sprite
         const bit = Math.max(1, Math.round((t.size * pop) / 8))
+        const x = Math.round(inside(t.x, (art[0].length + 2) * bit))
         const left = x - (art[0].length * bit) / 2
         const top = y - (art.length * bit) / 2
         // Dark outline (like the text stroke) so it reads over the white flash.
@@ -1283,6 +1289,7 @@ export class Renderer {
         drawSprite(ctx, art, left, top, bit, colors)
         continue
       }
+      const x = Math.round(inside(t.x, ctx.measureText(t.text).width + ctx.lineWidth))
       ctx.strokeText(t.text, x, y)
       ctx.fillStyle = t.color
       ctx.fillText(t.text, x, y)
