@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OnePixel cover</title>
+    <style>
+      html, body { margin: 0; background: #171717; overflow: hidden; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <script type="module">
+      // itch.io cover image, 630 x 500 (shown at 315 x 250 in listings).
+      // One lonely pixel in the middle, a crowd of drone cursors closing in,
+      // and the chaos the game turns into breaking out round the edges.
+      import { PAL, FONT, setup, field, pixel, bracket, cursor, laser, burst, ring, text, clickMe, done } from './art.js'
+
+      const { ctx, w, h, dpr, rng } = await setup()
+      field(ctx, w, h, dpr, 18, 1337)
+
+      // Fade the field out behind the title so it reads at thumbnail size.
+      const fade = ctx.createLinearGradient(0, 0, 0, h * 0.4)
+      fade.addColorStop(0, 'rgba(23,23,23,0.92)')
+      fade.addColorStop(0.7, 'rgba(23,23,23,0.6)')
+      fade.addColorStop(1, 'rgba(23,23,23,0)')
+      ctx.fillStyle = fade
+      ctx.fillRect(0, 0, w, h * 0.4)
+
+      // Chaos round the edges: a laser cutting the bottom-right corner, bursts and loose pixels.
+      laser(ctx, w * 0.55, h + 20, w + 20, h * 0.8, 9)
+      const bx = w * 0.85
+      const by = h * 0.5
+      burst(ctx, rng, bx, by, 32, 70, [PAL.gold, PAL.orange, PAL.red, PAL.white], 5)
+      ring(ctx, bx, by, 44, PAL.orange, 0.7)
+      text(ctx, 'CRIT!', bx - 6, by - 66, { font: FONT.pixel, size: 10, color: PAL.red })
+      text(ctx, '+2.49K', bx - 6, by - 48, { font: FONT.pixel, size: 14, color: PAL.gold })
+
+      burst(ctx, rng, w * 0.13, h * 0.82, 26, 46, [PAL.cyan, PAL.blue, PAL.white], 4)
+      ring(ctx, w * 0.13, h * 0.82, 34, PAL.cyan, 0.5)
+      text(ctx, '+28 XP', w * 0.13, h * 0.73, { font: FONT.pixel, size: 10, color: PAL.blue })
+
+      pixel(ctx, w * 0.17, h * 0.5, 12, PAL.gold, 0.16)
+      cursor(ctx, w * 0.17 + 14, h * 0.5 + 16, 3)
+      pixel(ctx, w * 0.31, h * 0.76, 10, PAL.blue, 0.14)
+      pixel(ctx, w * 0.36, h * 0.9, 10, PAL.white)
+
+      // The pixel, and a queue of drone cursors closing in on it. Cursors point
+      // up and left, so they line up below and to the right of their target.
+      const cx = w * 0.5
+      const cy = h * 0.6
+      pixel(ctx, cx, cy, 34, PAL.white, 0.08)
+      bracket(ctx, cx, cy, 36, 10, 3)
+      for (const [dx, dy] of [[24, 46], [8, 92], [58, 104], [-30, 132]]) cursor(ctx, cx + dx, cy + dy, 3)
+      clickMe(ctx, cx + 44, cy - 6, 1.15)
+
+      // Title and tagline.
+      text(ctx, 'ONEPIXEL', w / 2, 82, { font: FONT.pixel, size: 54, color: PAL.white, offset: 5, spacing: 2 })
+      text(ctx, 'THERE IS ONE PIXEL. CLICK IT.', w / 2, 140, { font: FONT.term, size: 30, color: PAL.ink, offset: 2, spacing: 1 })
+
+      done()
+    </script>
+  </body>
+</html>

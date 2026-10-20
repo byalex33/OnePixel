@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OnePixel embed background</title>
+    <style>
+      html, body { margin: 0; background: #171717; overflow: hidden; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <script type="module">
+      // itch.io embed background, 960 x 600: what shows behind the "Run game"
+      // button. The arena's dot-matrix landscape with a few pixels waiting,
+      // kept clear in the middle where itch.io puts the button.
+      import { PAL, setup, field, pixel, cursor, done } from './art.js'
+
+      const { ctx, w, h, dpr } = await setup()
+      field(ctx, w, h, dpr, 18, 2024)
+      pixel(ctx, w * 0.2, h * 0.3, 14, PAL.white)
+      pixel(ctx, w * 0.78, h * 0.24, 14, PAL.gold, 0.16)
+      pixel(ctx, w * 0.84, h * 0.62, 14, PAL.white)
+      pixel(ctx, w * 0.14, h * 0.66, 14, PAL.blue, 0.14)
+      pixel(ctx, w * 0.36, h * 0.78, 14, PAL.white)
+      cursor(ctx, w * 0.84 + 16, h * 0.62 + 18, 3)
+      cursor(ctx, w * 0.2 + 18, h * 0.3 + 22, 3)
+      done()
+    </script>
+  </body>
+</html>

@@ -2,6 +2,7 @@
   "name": "onepixel",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +14,8 @@
     "balance": "vitest run src/game/balance.test.ts --reporter verbose",
     "screenshots": "node scripts/screenshots.mjs",
     "trailer": "node scripts/trailer.mjs",
-    "itch": "npm run build && node scripts/itch.mjs"
+    "itch": "npm run build && node scripts/itch.mjs",
+    "itch-art": "node scripts/itch-art.mjs"
   },
   "dependencies": {
     "@fontsource/caveat": "^5.3.0",
