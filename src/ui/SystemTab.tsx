@@ -26,7 +26,8 @@ export function SystemTab() {
   const s = rt.game.state
   const [code, setCode] = useState('')
   const [importText, setImportText] = useState('')
-  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  /** `atCode` puts the line straight under the export code it talks about. */
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean; atCode?: boolean } | null>(null)
   const [confirm, setConfirm] = useState<'import' | 'reset' | 'reboot' | null>(null)
   const [credits, setCredits] = useState(false)
 
@@ -35,9 +36,9 @@ export function SystemTab() {
     setCode(c)
     try {
       await navigator.clipboard.writeText(c)
-      setMsg({ text: 'SAVE CODE COPIED' })
+      setMsg({ text: 'SAVE CODE COPIED', atCode: true })
     } catch {
-      setMsg({ text: 'COPY THE CODE BELOW' })
+      setMsg({ text: 'COPY THE CODE ABOVE', atCode: true })
     }
   }
 
@@ -74,6 +75,8 @@ export function SystemTab() {
   if (st.finalKills > 0) rows.push(['PIXEL ZERO', fmt(st.finalKills)])
   if (s.reboots > 0) rows.push(['REBOOTS', fmt(s.reboots)])
 
+  const message = msg && <div className={`font-pixel text-[8px] leading-relaxed ${msg.bad ? 'text-red' : 'text-gold'}`}>&gt; {msg.text}</div>
+
   return (
     <div className="space-y-4">
       <section className="frame p-3 pt-4">
@@ -100,6 +103,7 @@ export function SystemTab() {
         {code && (
           <textarea readOnly value={code} onFocus={(e) => e.currentTarget.select()} className="h-16 w-full resize-none border-2 border-line bg-bg p-1 font-term text-[14px] break-all text-dim outline-none" />
         )}
+        {msg?.atCode && message}
         <textarea
           value={importText}
           onChange={(e) => setImportText(e.target.value)}
@@ -120,7 +124,7 @@ export function SystemTab() {
             IMPORT
           </button>
         )}
-        {msg && <div className={`font-pixel text-[8px] leading-relaxed ${msg.bad ? 'text-red' : 'text-gold'}`}>&gt; {msg.text}</div>}
+        {msg && !msg.atCode && message}
       </section>
 
       <section className="frame p-3 pt-4">
