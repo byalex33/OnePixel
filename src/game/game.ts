@@ -341,6 +341,16 @@ export class Game {
     return this.state.stats.bossKills - this.state.lastFinalAt >= C.FINAL_EVERY
   }
 
+  /**
+   * AUTO keeps a charged nuke back while PIXEL ZERO is due or not yet fighting. Its lockdown means no kills,
+   * so nothing can charge the nuke during the fight; this way AUTO still lands its one nuke hit.
+   */
+  get holdNukeForFinal(): boolean {
+    const b = this.boss
+    if (b) return b.final && b.phase !== 'fight'
+    return this.finalDue && hasFeature(this.state.level, 'boss')
+  }
+
   /** While PIXEL ZERO is up nothing else spawns: it is just the player and the boss. */
   get lockdown(): boolean {
     return this.boss?.final === true
@@ -427,7 +437,7 @@ export class Game {
     if (this.statsDirty) this.refreshStats()
 
     this.updateCombo(dt)
-    if (this.state.settings.autoNuke && this.autoNukeUnlocked && this.nukeReady) this.launchNuke()
+    if (this.state.settings.autoNuke && this.autoNukeUnlocked && this.nukeReady && !this.holdNukeForFinal) this.launchNuke()
     this.updateNuke(dt)
     this.updatePixels(dt)
     this.updateRespawns(dt)

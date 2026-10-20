@@ -945,6 +945,32 @@ describe('PIXEL ZERO, the final boss', () => {
     expect(g.spawnBoss().tier).toBe(2)
   })
 
+  it('AUTO holds a charged nuke for PIXEL ZERO and fires it once the fight starts', () => {
+    const g = makeGame((s) => {
+      s.level = 20
+      s.stats.bossKills = C.FINAL_EVERY
+      s.bossTimer = 1
+      s.upgrades.nukeCharge = UPGRADE_MAP.nukeCharge.max
+      s.settings.autoNuke = true
+    })
+    g.state.nukeCharge = g.stats.nukeKills
+    expect(g.holdNukeForFinal).toBe(true)
+    run(g, 0.5)
+    expect(g.nuke).toBeNull()
+    expect(g.state.nukeCharge).toBe(g.stats.nukeKills)
+
+    run(g, 0.6) // it surfaces, but a nuke during the rise would miss it
+    const b = g.boss!
+    expect(b.final).toBe(true)
+    expect(b.phase).toBe('rise')
+    expect(g.nuke).toBeNull()
+
+    run(g, C.FINAL_RISE + C.NUKE_WARMUP + 0.1)
+    expect(b.phase).toBe('fight')
+    expect(b.nuked).toBe(true)
+    expect(b.hp).toBeLessThanOrEqual(b.maxHp * (1 - C.FINAL_NUKE_FRACTION) + 1)
+  })
+
   it('awards SYSTEM CRASH at once, so a REBOOT straight from the crash screen keeps it', () => {
     const { g, b } = finalFight()
     b.hp = 1

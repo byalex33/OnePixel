@@ -140,13 +140,13 @@ export function NukeControl() {
           role="switch"
           aria-checked={auto}
           aria-label="Auto launch nuke"
-          title={auto ? 'Auto launch is on' : 'Auto launch is off'}
+          title={!auto ? 'Auto launch is off' : g.holdNukeForFinal ? 'Auto launch is holding the nuke for PIXEL ZERO' : 'Auto launch is on'}
           onClick={() => rt.setSetting('autoNuke', !auto)}
           className={`frame px-shadow pointer-events-auto anim-pop flex flex-col items-center justify-center gap-1 px-2.5 pt-3 pb-2 ${auto ? 'border-red' : ''}`}
         >
           <span className={`frame-title ${auto ? 'text-red' : ''}`}>AUTO</span>
           <span className={`font-pixel text-[9px] ${auto ? 'text-red' : 'text-dim'}`}>[{auto ? 'X' : ' '}]</span>
-          <span className={`font-pixel text-[7px] ${auto ? 'text-ink' : 'text-mute'}`}>{auto ? 'ON' : 'OFF'}</span>
+          <span className={`font-pixel text-[7px] ${auto ? 'text-ink' : 'text-mute'}`}>{!auto ? 'OFF' : g.holdNukeForFinal ? 'HOLD' : 'ON'}</span>
         </button>
       )}
     </div>
