@@ -56,8 +56,9 @@ export const bossBonus = (kills: number) => 1 + 0.05 * kills
 /** Armor piercing: boss damage multiplier. */
 export const pierceMult = (l: number) => 1 + 0.25 * l
 
-/** XP needed to go from `level` to `level + 1`: doubles each level, easing to x1.75 from level 12 so the late game doesn't stall. */
-export const xpToNext = (level: number) => Math.round(10 * Math.pow(2.0, Math.min(level, 11) - 1) * Math.pow(1.75, Math.max(0, level - 11)))
+/** XP needed to go from `level` to `level + 1`: doubles each level, easing to x1.75 from level 12 and x1.5 from level 15 so the late game doesn't stall. */
+export const xpToNext = (level: number) =>
+  Math.round(10 * Math.pow(2.0, Math.min(level, 11) - 1) * Math.pow(1.75, Math.min(3, Math.max(0, level - 11))) * Math.pow(1.5, Math.max(0, level - 14)))
 
 export const upgradeCost = (base: number, growth: number, level: number) =>
   Math.floor(base * Math.pow(growth, level))

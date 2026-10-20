@@ -772,7 +772,7 @@ describe('the boss', () => {
     g.pointerDown(120, 80)
     expect(b.hp).toBeCloseTo(b.maxHp * 0.4) // can't be hurt on the way down
     expect(g.state.stats.bossEscapes).toBe(1)
-    expect(g.state.bossTimer).toBe(C.BOSS_INTERVAL)
+    expect(g.state.bossTimer).toBe(C.BOSS_RETRY_INTERVAL)
     expect(g.state.bossHealth).toBeCloseTo(0.4 + C.BOSS_ESCAPE_RECOVER)
     run(g, C.BOSS_SINK)
     expect(g.boss).toBeNull()

@@ -1320,7 +1320,7 @@ export class Game {
     b.phase = 'sink'
     b.t = 0
     this.state.stats.bossEscapes++
-    this.state.bossTimer = C.BOSS_INTERVAL
+    this.state.bossTimer = C.BOSS_RETRY_INTERVAL
     // It keeps its wounds, so a tough tier becomes a siege rather than a wall.
     this.state.bossHealth = Math.min(1, b.hp / b.maxHp + (b.final ? C.FINAL_ESCAPE_RECOVER : C.BOSS_ESCAPE_RECOVER))
     this.emit({ type: 'boss-escape', x: b.x, y: b.y })
