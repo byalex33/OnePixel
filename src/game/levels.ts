@@ -47,6 +47,11 @@ export function levelDef(level: number): LevelDef | undefined {
   return LEVELS.find((l) => l.level === level)
 }
 
+/** Unlocks reached after `from` up to and including `to`, e.g. levels gained while away. */
+export function unlocksBetween(from: number, to: number): LevelDef[] {
+  return LEVELS.filter((l) => l.level > from && l.level <= to)
+}
+
 /** Unlocks the player can see coming: the next `visible` are named, the rest are `???`. */
 export function upcomingUnlocks(level: number, visible = 2): { def: LevelDef; hidden: boolean }[] {
   return LEVELS.filter((l) => l.level > level).map((def, i) => ({ def, hidden: i >= visible }))

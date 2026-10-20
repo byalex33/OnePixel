@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OnePixel banner</title>
+    <style>
+      html, body { margin: 0; background: #171717; overflow: hidden; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <script type="module">
+      // itch.io page banner, 960 x 240: the title on the left, the arena
+      // waking up on the right.
+      import { PAL, FONT, setup, field, pixel, bracket, cursor, laser, burst, ring, text, clickMe, done } from './art.js'
+
+      const { ctx, w, h, dpr, rng } = await setup()
+      field(ctx, w, h, dpr, 18, 4242)
+
+      // Fade the field out behind the title.
+      const fade = ctx.createLinearGradient(0, 0, w * 0.55, 0)
+      fade.addColorStop(0, 'rgba(23,23,23,0.92)')
+      fade.addColorStop(0.75, 'rgba(23,23,23,0.7)')
+      fade.addColorStop(1, 'rgba(23,23,23,0)')
+      ctx.fillStyle = fade
+      ctx.fillRect(0, 0, w * 0.55, h)
+
+      laser(ctx, w * 0.82, h + 20, w + 20, h * 0.35, 7)
+
+      const bx = w * 0.83
+      const by = h * 0.62
+      burst(ctx, rng, bx, by, 24, 50, [PAL.gold, PAL.orange, PAL.red, PAL.white], 4)
+      ring(ctx, bx, by, 32, PAL.orange, 0.7)
+      text(ctx, '+2.49K', bx, by - 46, { font: FONT.pixel, size: 12, color: PAL.gold })
+
+      pixel(ctx, w * 0.78, h * 0.26, 10, PAL.gold, 0.16)
+      pixel(ctx, w * 0.95, h * 0.3, 9, PAL.blue, 0.14)
+
+      const cx = w * 0.6
+      const cy = h * 0.42
+      pixel(ctx, cx, cy, 26, PAL.white, 0.08)
+      bracket(ctx, cx, cy, 28, 8, 2)
+      for (const [dx, dy] of [[18, 36], [2, 74], [48, 80]]) cursor(ctx, cx + dx, cy + dy, 3)
+      clickMe(ctx, cx + 34, cy - 4, 1)
+
+      text(ctx, 'ONEPIXEL', 44, h * 0.42, { font: FONT.pixel, size: 46, color: PAL.white, align: 'left', offset: 4, spacing: 2 })
+      text(ctx, 'THERE IS ONE PIXEL. CLICK IT.', 46, h * 0.67, { font: FONT.term, size: 28, color: PAL.ink, align: 'left', offset: 2, spacing: 1 })
+
+      done()
+    </script>
+  </body>
+</html>

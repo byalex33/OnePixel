@@ -34,6 +34,7 @@ A retro dot-matrix incremental game about destroying a single pixel, and then a 
 - [Deploying](#deploying)
 - [Roadmap](#roadmap)
 - [Credits](#credits)
+- [License](#license)
 
 ## Trailer
 
@@ -281,6 +282,15 @@ Hosted on Vercel, configured in `vercel.json` (Vite build, output `dist`).
 - **Deploy:** `vercel --prod`, or push to `main` once the GitHub repo is connected in the Vercel dashboard.
 - **Caching:** hashed files under `/assets` are cached for a year as immutable; `index.html` uses Vercel's default revalidation, so a new deploy shows up immediately.
 
+### itch.io
+
+`npm run itch` builds and writes `release/onepixel-web-<version>.zip` with `index.html` at the root. Upload it on the itch.io project page as an HTML file and tick "This file will be played in the browser".
+
+- The build uses relative URLs (`base: './'` in `vite.config.ts`) because itch.io serves games from a subpath, and fonts are bundled through Fontsource, so nothing is loaded from other hosts.
+- Suggested embed settings: 1280 x 800 viewport, "Mobile friendly", and the fullscreen button on.
+- Saves use `localStorage` on itch.io's shared game domain under the `onepixel.save` key, so they don't carry over from the Vercel site.
+- Page art and copy live in `docs/itch/`. `npm run itch-art` (with `npm run dev` running) re-renders the screenshots, cover and banner; `docs/itch/page.md` has the description and page settings.
+
 ## Roadmap
 
 - More of the late game beyond level 20 (something is stirring beneath the grid)
@@ -290,6 +300,10 @@ Hosted on Vercel, configured in `vercel.json` (Vite build, output `dist`).
 
 ## Credits
 
-- Fonts: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P), [VT323](https://fonts.google.com/specimen/VT323) and [Caveat](https://fonts.google.com/specimen/Caveat), via Google Fonts (SIL Open Font License)
+- Fonts: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P), [VT323](https://fonts.google.com/specimen/VT323) and [Caveat](https://fonts.google.com/specimen/Caveat), bundled via [Fontsource](https://fontsource.org/) (SIL Open Font License)
 - Icons: [react-icons](https://react-icons.github.io/react-icons/), including [Game Icons](https://game-icons.net/) (CC BY 3.0)
 - Built with [Vite](https://vite.dev/), [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS](https://tailwindcss.com/) and [Vitest](https://vitest.dev/)
+
+## License
+
+The code is released under the [MIT License](LICENSE). The fonts and icons keep their own licences, listed under [Credits](#credits).

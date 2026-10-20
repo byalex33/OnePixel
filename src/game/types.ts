@@ -97,6 +97,12 @@ export interface SaveState {
   bossTimer: number
   /** Fraction of max HP the next boss surfaces with. Below 1 after one escapes wounded. */
   bossHealth: number
+  /** Seconds left on a fight that was saved mid-way, or 0 for a fresh fight. */
+  bossTimeLeft: number
+  /** The fight that was saved mid-way has already taken its nuke hit. */
+  bossNuked: boolean
+  /** stats.bossKills when PIXEL ZERO last died. The next one is due FINAL_EVERY regular kills later. */
+  lastFinalAt: number
   seenUpgrades: UpgradeId[]
   reveal: { hud: boolean; panel: boolean }
   settings: Settings

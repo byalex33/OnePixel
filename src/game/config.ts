@@ -70,6 +70,8 @@ export const BOSS_SINK = 1.2
 /** Seconds the player has to finish it before it burrows back down. */
 export const BOSS_FIGHT_TIME = 60
 export const BOSS_INTERVAL = 180
+/** After an escape it resurfaces sooner, so a siege keeps its momentum. */
+export const BOSS_RETRY_INTERVAL = 90
 export const BOSS_FIRST_DELAY = 6
 export const BOSS_SPEED = 9
 export const BOSS_ENRAGED_SPEED = 17
@@ -81,7 +83,7 @@ export const BOSS_EAT_REACH = 12
 /** Fraction of max HP healed per pixel swallowed. */
 export const BOSS_EAT_HEAL = 0.02
 /** An escaped boss comes back with the damage it took, minus this much recovery. */
-export const BOSS_ESCAPE_RECOVER = 0.15
+export const BOSS_ESCAPE_RECOVER = 0.08
 /** Damage per hit by source, before armor piercing (and, for taps, crits and combos). */
 export const BOSS_DAMAGE = { click: 10, drone: 1, chain: 4, bomblet: 12, bomb: 35, laser: 25 } as const
 /** A nuke takes this fraction of max HP, once per fight (late-game nukes recharge in seconds). */

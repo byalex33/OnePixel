@@ -52,9 +52,9 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'cluster', name: 'CLUSTER BOMBS', desc: 'Bombs scatter three bomblets when they burst.', requires: 'cluster', baseCost: 400_000, growth: 1, max: 1, show: perk },
   { id: 'twin', name: 'TWIN LASERS', desc: 'Every laser strike fires two beams.', requires: 'twin', baseCost: 1_500_000, growth: 1, max: 1, show: perk },
   { id: 'goldRain', name: 'GOLDEN STORMS', desc: 'Pixel rain carries golden pixels.', requires: 'goldRain', baseCost: 5_000_000, growth: 1, max: 1, show: perk },
-  { id: 'rainbow', name: 'RAINBOW MODE', desc: 'Rare rainbow pixels. Pop one and every pixel pays x10 or more while it lasts. Levels: bigger, longer, more often.', requires: 'rainbow', baseCost: 2_000_000_000, growth: 2.2, max: 9, show: (l) => off(l, () => `x${F.rainbowMult(l)} ${F.rainbowDuration(l).toFixed(1)}s`) },
-  { id: 'overclock', name: 'OVERCLOCK', desc: 'Drones, bombs, lasers and storms run 25% faster.', requires: 'overclock', baseCost: 15_000_000_000, growth: 1, max: 1, show: perk },
-  { id: 'pierce', name: 'ARMOR PIERCING', desc: 'Every hit on the boss does more damage.', requires: 'boss', baseCost: 40_000_000_000, growth: 1.8, max: 25, show: (l) => x(F.pierceMult(l)) },
+  { id: 'rainbow', name: 'RAINBOW MODE', desc: 'Rare rainbow pixels. Pop one and every pixel pays x10 or more while it lasts. Levels: bigger, longer, more often.', requires: 'rainbow', baseCost: 100_000_000, growth: 2.2, max: 9, show: (l) => off(l, () => `x${F.rainbowMult(l)} ${F.rainbowDuration(l).toFixed(1)}s`) },
+  { id: 'overclock', name: 'OVERCLOCK', desc: 'Drones, bombs, lasers and storms run 25% faster.', requires: 'overclock', baseCost: 150_000_000, growth: 1, max: 1, show: perk },
+  { id: 'pierce', name: 'ARMOR PIERCING', desc: 'Every hit on the boss does more damage.', requires: 'boss', baseCost: 250_000_000, growth: 1.8, max: 25, show: (l) => x(F.pierceMult(l)) },
 ]
 
 export const UPGRADE_MAP = Object.fromEntries(UPGRADES.map((d) => [d.id, d])) as Record<UpgradeId, UpgradeDef>

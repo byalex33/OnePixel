@@ -167,6 +167,13 @@ describe('save files', () => {
     expect(hostile.stats.bossKills).toBe(0)
   })
 
+  it('load saves from before PIXEL ZERO was tracked, assuming each one came on schedule', () => {
+    expect(sanitizeState({ stats: { bossKills: 12, finalKills: 0 } }).lastFinalAt).toBe(0)
+    expect(sanitizeState({ stats: { bossKills: 7, finalKills: 1 } }).lastFinalAt).toBe(5)
+    expect(sanitizeState({ stats: { bossKills: 3, finalKills: 4 } }).lastFinalAt).toBe(3)
+    expect(sanitizeState({ lastFinalAt: 99, stats: { bossKills: 12 } }).lastFinalAt).toBe(12)
+  })
+
   it('persist to and load from storage, surviving corruption', () => {
     const store = new MemStore()
     const s = createInitialState()

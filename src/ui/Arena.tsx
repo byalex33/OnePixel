@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { Rect } from '../game/game'
 import { useRuntime } from './hooks'
 import { ClickMeHint } from './ClickMeHint'
-import { BalanceBox, BossBar, ComboMeter, NukeControl, StormStatus } from './Hud'
+import { BalanceBox, BossBar, BossStatus, ComboMeter, NukeControl, StormStatus } from './Hud'
 import { LevelUpOverlay, OfflineModal, Toasts } from './Notices'
 
 export function Arena() {
@@ -85,6 +85,7 @@ export function Arena() {
       <BossBar ref={bossRef} />
       <BalanceBox ref={balanceRef} />
       <div ref={bottomRef} className="pointer-events-none absolute bottom-3 left-3 flex flex-col items-start gap-3">
+        <BossStatus />
         <StormStatus />
         <NukeControl />
       </div>

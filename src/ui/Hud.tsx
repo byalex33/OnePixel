@@ -140,14 +140,35 @@ export function NukeControl() {
           role="switch"
           aria-checked={auto}
           aria-label="Auto launch nuke"
-          title={auto ? 'Auto launch is on' : 'Auto launch is off'}
+          title={!auto ? 'Auto launch is off' : g.holdNukeForFinal ? 'Auto launch is holding the nuke for PIXEL ZERO' : 'Auto launch is on'}
           onClick={() => rt.setSetting('autoNuke', !auto)}
           className={`frame px-shadow pointer-events-auto anim-pop flex flex-col items-center justify-center gap-1 px-2.5 pt-3 pb-2 ${auto ? 'border-red' : ''}`}
         >
           <span className={`frame-title ${auto ? 'text-red' : ''}`}>AUTO</span>
           <span className={`font-pixel text-[9px] ${auto ? 'text-red' : 'text-dim'}`}>[{auto ? 'X' : ' '}]</span>
-          <span className={`font-pixel text-[7px] ${auto ? 'text-ink' : 'text-mute'}`}>{auto ? 'ON' : 'OFF'}</span>
+          <span className={`font-pixel text-[7px] ${auto ? 'text-ink' : 'text-mute'}`}>{!auto ? 'OFF' : g.holdNukeForFinal ? 'HOLD' : 'ON'}</span>
         </button>
+      )}
+    </div>
+  )
+}
+
+/** Between fights: when the next boss surfaces, how wounded it is, and how far off PIXEL ZERO is. */
+export function BossStatus() {
+  const rt = useRuntime()
+  const next = rt.game.nextBoss
+  if (!next) return null
+  const shadow = { textShadow: '2px 2px 0 #000' }
+  return (
+    <div className="font-pixel text-[8px] leading-relaxed text-dim" style={shadow}>
+      <div>
+        <span className={next.final ? 'text-cyan' : 'text-red'}>{next.final ? FINAL_NAME : BOSS_NAME}</span> IN {fmtTime(next.seconds)}
+        {next.health < 1 && <span className="text-ink"> {Math.round(next.health * 100)}% HP</span>}
+      </div>
+      {!next.final && (
+        <div>
+          <span className="text-cyan">{FINAL_NAME}</span> AFTER {next.killsToFinal} MORE {next.killsToFinal === 1 ? 'KILL' : 'KILLS'}
+        </div>
       )}
     </div>
   )

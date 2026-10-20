@@ -2,6 +2,7 @@ import * as C from './config'
 import { ACHIEVEMENTS } from './achievements'
 import { bossMaxHp, comboMult, computeStats, finalMaxHp, rebootBossHpMult, xpToNext, type Stats } from './formulas'
 import { hasFeature } from './levels'
+import { offlineGains, type OfflineGains } from './offline'
 import { Rng } from './rng'
 import { createInitialState } from './state'
 import type { BossDamageSource, Cause, GameEvent, PixelKind, SaveState, UpgradeId } from './types'
@@ -336,10 +337,30 @@ export class Game {
     }
   }
 
-  /** The next boss to surface is PIXEL ZERO: after every FINAL_EVERY regular kills. */
+  /** The next boss to surface is PIXEL ZERO: FINAL_EVERY regular kills after the last one. */
   get finalDue(): boolean {
-    const st = this.state.stats
-    return st.bossKills >= C.FINAL_EVERY * (st.finalKills + 1)
+    return this.state.stats.bossKills - this.state.lastFinalAt >= C.FINAL_EVERY
+  }
+
+  /**
+   * AUTO keeps a charged nuke back while PIXEL ZERO is due or not yet fighting. Its lockdown means no kills,
+   * so nothing can charge the nuke during the fight; this way AUTO still lands its one nuke hit.
+   */
+  get holdNukeForFinal(): boolean {
+    const b = this.boss
+    if (b) return b.final && b.phase !== 'fight'
+    return this.finalDue && hasFeature(this.state.level, 'boss')
+  }
+
+  /** What surfaces next and when, for the HUD. Null before bosses unlock or while one is up. */
+  get nextBoss(): { final: boolean; seconds: number; health: number; killsToFinal: number } | null {
+    if (this.boss || !hasFeature(this.state.level, 'boss')) return null
+    return {
+      final: this.finalDue,
+      seconds: this.state.bossTimer,
+      health: this.state.bossHealth,
+      killsToFinal: Math.max(0, C.FINAL_EVERY - (this.state.stats.bossKills - this.state.lastFinalAt)),
+    }
   }
 
   /** While PIXEL ZERO is up nothing else spawns: it is just the player and the boss. */
@@ -404,17 +425,17 @@ export class Game {
       tier,
       phase: 'rise',
       t: 0,
-      timeLeft: final ? C.FINAL_FIGHT_TIME : C.BOSS_FIGHT_TIME,
+      timeLeft: this.state.bossTimeLeft > 0 ? this.state.bossTimeLeft : final ? C.FINAL_FIGHT_TIME : C.BOSS_FIGHT_TIME,
       eatTimer: C.BOSS_EAT_INTERVAL,
       enraged: hp <= maxHp * C.BOSS_ENRAGE_AT,
-      nuked: false,
+      nuked: this.state.bossNuked,
       final,
       spots: final ? Array.from({ length: C.FINAL_SPOTS }, () => this.randomSpot(r)) : [],
       spotTimer: C.FINAL_SPOT_MOVE,
       empTimer: C.FINAL_EMP_INTERVAL,
       empCharge: 0,
     }
-    // Held at 0 while the boss is up, so reloading mid-fight brings it straight back.
+    // Held at 0 while the boss is up, so reloading mid-fight brings it straight back (see saveState).
     this.state.bossTimer = 0
     this.emit({ type: 'boss-rise', x: pos.x, y: pos.y, tier, final })
     if (final) this.clearArenaFor(pos)
@@ -428,7 +449,7 @@ export class Game {
     if (this.statsDirty) this.refreshStats()
 
     this.updateCombo(dt)
-    if (this.state.settings.autoNuke && this.autoNukeUnlocked && this.nukeReady) this.launchNuke()
+    if (this.state.settings.autoNuke && this.autoNukeUnlocked && this.nukeReady && !this.holdNukeForFinal) this.launchNuke()
     this.updateNuke(dt)
     this.updatePixels(dt)
     this.updateRespawns(dt)
@@ -460,6 +481,35 @@ export class Game {
       this.achTimer = 0.5
       this.checkAchievements()
     }
+  }
+
+  /** The state to persist. A boss mid-fight writes down its wounds and clock, so a reload resumes the same fight. */
+  saveState(): SaveState {
+    const b = this.fightingBoss()
+    if (b) {
+      this.state.bossHealth = b.hp / b.maxHp
+      this.state.bossTimeLeft = b.timeLeft
+      this.state.bossNuked = b.nuked
+    }
+    return this.state
+  }
+
+  /**
+   * Time away: nothing moves behind the crash screen, and PIXEL ZERO's lockdown means machines kill nothing,
+   * so neither pays. Otherwise pays the automation rate. Returns what was paid, or null for nothing.
+   */
+  collectOffline(seconds: number): OfflineGains | null {
+    if (this.offlineFrozen) return null
+    const gains = offlineGains(this.state, seconds)
+    if (gains.kills <= 0) return null
+    this.grant(gains.pixels, gains.xp)
+    return gains
+  }
+
+  private get offlineFrozen(): boolean {
+    if (this.state.crashPending || this.lockdown) return true
+    // Just loaded from a save made mid-fight: PIXEL ZERO comes straight back on the first tick.
+    return this.boss === null && this.state.bossTimer <= 0 && this.finalDue && hasFeature(this.state.level, 'boss')
   }
 
   /** Award pixels/xp computed by offline progress. */
@@ -1251,6 +1301,7 @@ export class Game {
     this.state.stats.bossKills++
     this.state.bossTimer = C.BOSS_INTERVAL
     this.state.bossHealth = 1
+    this.clearSavedFight()
     this.refreshStats()
     // It bursts into golden loot. Drones leave golden pixels alone, so it is all yours.
     const n = Math.min(C.BOSS_LOOT_MAX, C.BOSS_LOOT_BASE + C.BOSS_LOOT_PER_TIER * b.tier)
@@ -1283,11 +1334,15 @@ export class Game {
     this.earn(amount, true)
     this.addXp(xpToNext(this.state.level) * C.FINAL_REWARD_XP_FRAC)
     this.state.stats.finalKills++
+    this.state.lastFinalAt = this.state.stats.bossKills
     this.state.bossTimer = C.BOSS_INTERVAL
     this.state.bossHealth = 1
+    this.clearSavedFight()
     this.state.crashPending = true
     this.refreshStats()
     this.emit({ type: 'final-defeat', x: b.x, y: b.y, amount })
+    // Nothing ticks behind the crash screen, so award SYSTEM CRASH now or a REBOOT would skip it.
+    this.checkAchievements()
     this.revision++
   }
 
@@ -1316,13 +1371,20 @@ export class Game {
     }
   }
 
+  /** The fight is over: the next boss gets a full clock and its own nuke hit. */
+  private clearSavedFight(): void {
+    this.state.bossTimeLeft = 0
+    this.state.bossNuked = false
+  }
+
   private escapeBoss(b: Boss): void {
     b.phase = 'sink'
     b.t = 0
     this.state.stats.bossEscapes++
-    this.state.bossTimer = C.BOSS_INTERVAL
+    this.state.bossTimer = C.BOSS_RETRY_INTERVAL
     // It keeps its wounds, so a tough tier becomes a siege rather than a wall.
     this.state.bossHealth = Math.min(1, b.hp / b.maxHp + (b.final ? C.FINAL_ESCAPE_RECOVER : C.BOSS_ESCAPE_RECOVER))
+    this.clearSavedFight()
     this.emit({ type: 'boss-escape', x: b.x, y: b.y })
     this.revision++
   }
