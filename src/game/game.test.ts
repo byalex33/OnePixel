@@ -621,8 +621,12 @@ describe('the boss', () => {
     expect(g.nextBoss).toEqual({ final: false, seconds: 42, health: 0.6, killsToFinal: 2 })
     g.state.stats.bossKills = 5
     expect(g.nextBoss).toMatchObject({ final: true, killsToFinal: 0 })
+    // PIXEL ZERO died at five kills: the next one is five regular kills after that.
     g.state.stats.finalKills = 1
+    g.state.lastFinalAt = 5
     expect(g.nextBoss).toMatchObject({ final: false, killsToFinal: 5 })
+    g.state.stats.bossKills = 8
+    expect(g.nextBoss).toMatchObject({ final: false, killsToFinal: 2 })
     g.spawnBoss()
     expect(g.nextBoss).toBeNull()
   })
