@@ -84,6 +84,7 @@ export function SystemTab() {
         <Toggle k="sound" label="SOUND" />
         <Toggle k="music" label="MUSIC" />
         <Toggle k="shake" label="SCREEN SHAKE" />
+        <Toggle k="flash" label="SCREEN FLASH" />
         <Toggle k="haptics" label="HAPTICS" />
       </section>
 

@@ -44,7 +44,7 @@ function Crash() {
     return () => window.clearInterval(id)
   }, [])
 
-  const glitching = step < 2
+  const glitching = step < 2 && s.settings.flash
   const pct = PROGRESS[Math.min(step, PROGRESS.length - 1)]
   const done = step >= PROGRESS.length
   const next = s.reboots + 1

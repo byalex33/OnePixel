@@ -299,6 +299,7 @@ export class Runtime {
     this.music.setEnabled(s.music)
     if (this.renderer) {
       this.renderer.shakeEnabled = s.shake
+      this.renderer.flashEnabled = s.flash
       this.renderer.reducedMotion = this.reducedMotion
     }
   }

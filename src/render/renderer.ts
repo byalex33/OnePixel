@@ -105,6 +105,7 @@ export class Renderer {
   cssW = 1
   cssH = 1
   shakeEnabled = true
+  flashEnabled = true
   reducedMotion = false
 
   private ctx: CanvasRenderingContext2D
@@ -567,6 +568,7 @@ export class Renderer {
   }
 
   private setFlash(color: string, alpha: number, dur: number): void {
+    if (!this.flashEnabled) return
     if (this.flash.t < this.flash.dur && this.flash.alpha * (1 - this.flash.t / this.flash.dur) > alpha) return
     this.flash = { t: 0, dur, color, alpha: this.reducedMotion ? alpha * 0.4 : alpha }
   }
@@ -1365,7 +1367,7 @@ export class Renderer {
 
   private drawFlash(): void {
     const f = this.flash
-    if (f.t >= f.dur) return
+    if (!this.flashEnabled || f.t >= f.dur) return
     const a = f.alpha * Math.pow(1 - f.t / f.dur, 2)
     if (a <= 0.01) return
     this.ctx.globalAlpha = a

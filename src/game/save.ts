@@ -81,6 +81,7 @@ export function sanitizeState(raw: unknown): SaveState {
       music: bool(raw.settings.music, true),
       autoNuke: bool(raw.settings.autoNuke, true),
       shake: bool(raw.settings.shake, true),
+      flash: bool(raw.settings.flash, true),
       haptics: bool(raw.settings.haptics, true),
     }
   }

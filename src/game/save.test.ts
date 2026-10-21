@@ -138,6 +138,7 @@ describe('save files', () => {
     expect(s.settings.sound).toBe(true)
     expect(s.settings.music).toBe(true)
     expect(s.settings.autoNuke).toBe(true)
+    expect(s.settings.flash).toBe(true)
   })
 
   it('load saves from before the fox was removed', () => {

@@ -79,6 +79,8 @@ export interface Settings {
   /** Launch the nuke as soon as it charges. Only offered once NUKE SILO is maxed. */
   autoNuke: boolean
   shake: boolean
+  /** Full-screen colour flashes on big hits, kills and level-ups, and the crash screen's black flicker. */
+  flash: boolean
   haptics: boolean
 }
 

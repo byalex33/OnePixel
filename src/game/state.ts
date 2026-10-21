@@ -54,7 +54,7 @@ export function createInitialState(): SaveState {
     lastFinalAt: 0,
     seenUpgrades: [],
     reveal: { hud: false, panel: false },
-    settings: { sound: true, music: true, autoNuke: true, shake: true, haptics: true },
+    settings: { sound: true, music: true, autoNuke: true, shake: true, flash: true, haptics: true },
     reboots: 0,
     crashPending: false,
   }
