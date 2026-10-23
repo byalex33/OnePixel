@@ -171,6 +171,10 @@ describe('format', () => {
     expect(fmt(1234)).toBe('1.23K')
     expect(fmt(45_600_000)).toBe('45.6M')
     expect(fmt(Infinity)).toBe('---')
+    // Rounding up never spills past the band it lands in.
+    expect(fmt(9999)).toBe('10.0K')
+    expect(fmt(99_996)).toBe('100K')
+    expect(fmt(999_600)).toBe('1.00M')
   })
 
   it('formats time', () => {

@@ -59,6 +59,8 @@ interface Absorb {
 
 const FONT = '"Press Start 2P", ui-monospace, monospace'
 const MAX_TEXTS = 40
+/** Rainbow colours by whole degree, so a busy rainbow frame reuses strings instead of building hundreds. */
+const HUES = Array.from({ length: 360 }, (_, h) => `hsl(${h} 100% 62%)`)
 
 /** The boss is drawn as a BOSS_CELLS x BOSS_CELLS block that cracks apart as it takes damage. */
 const BOSS_CELLS = 7
@@ -487,7 +489,7 @@ export class Renderer {
   }
 
   private hue(x: number, y: number): string {
-    return `hsl(${rainbowHue(this.time, x, y)} 100% 62%)`
+    return HUES[(Math.floor(rainbowHue(this.time, x, y)) + 360) % 360]
   }
 
   private levelFx(): void {
@@ -678,11 +680,20 @@ export class Renderer {
       const r1 = Math.min(f.rows - 1, Math.ceil((r.y + radius + band - f.oy) / f.spacing))
       ctx.globalAlpha = (1 - p) * 0.85
       ctx.beginPath()
+      const outer = radius + band
+      const inner = radius - band
       for (let row = r0; row <= r1; row++) {
         const y = f.oy + row * f.spacing
+        const dy = y - r.y
+        if (Math.abs(dy) > outer) continue
+        // Only the dots in the band can light up: skip the columns inside the inner circle.
+        const hole = inner > Math.abs(dy) ? Math.sqrt(inner * inner - dy * dy) : -1
+        const h0 = hole > 0 ? Math.ceil((r.x - hole - f.ox) / f.spacing) + 1 : c1 + 1
+        const h1 = hole > 0 ? Math.floor((r.x + hole - f.ox) / f.spacing) - 1 : c1
         for (let col = c0; col <= c1; col++) {
+          if (col === h0 && h1 >= h0) col = h1 + 1
           const x = f.ox + col * f.spacing
-          const d = Math.abs(Math.hypot(x - r.x, y - r.y) - radius)
+          const d = Math.abs(Math.hypot(x - r.x, dy) - radius)
           if (d > band) continue
           const rad = 0.8 + 1.6 * (1 - d / band)
           ctx.moveTo(x + rad, y)
@@ -1247,13 +1258,15 @@ export class Renderer {
       const radius = r.max * (1 - Math.pow(1 - p, 3))
       ctx.globalAlpha = 1 - p
       ctx.fillStyle = r.color
-      // Rings are drawn as chunky dots around the circumference.
+      // Rings are drawn as chunky dots around the circumference, filled as one path per ring.
       const dot = r.dotted ? 2 : 3
       const n = Math.min(160, Math.max(8, Math.round((2 * Math.PI * radius) / (r.dotted ? 7 : 4))))
+      ctx.beginPath()
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2
-        ctx.fillRect(Math.round(r.x + Math.cos(a) * radius - dot / 2), Math.round(r.y + Math.sin(a) * radius - dot / 2), dot, dot)
+        ctx.rect(Math.round(r.x + Math.cos(a) * radius - dot / 2), Math.round(r.y + Math.sin(a) * radius - dot / 2), dot, dot)
       }
+      ctx.fill()
     }
     ctx.globalAlpha = 1
   }
@@ -1269,15 +1282,20 @@ export class Renderer {
       const half = width / 2
       return this.cssW < width + 2 * pad ? this.cssW / 2 : Math.max(pad + half, Math.min(this.cssW - pad - half, x))
     }
+    ctx.lineWidth = 4
+    ctx.strokeStyle = PAL.bg
+    // Setting ctx.font re-parses the string, so only do it when the size changes.
+    let lastSize = -1
     for (const t of this.texts) {
       const p = t.t / t.dur
       const pop = p < 0.12 ? 0.6 + (p / 0.12) * 0.6 : p < 0.2 ? 1.2 - ((p - 0.12) / 0.08) * 0.2 : 1
       const size = Math.round(t.size * pop)
       const rise = Math.round((1 - Math.pow(1 - p, 2)) * 28)
       ctx.globalAlpha = p > 0.8 ? 0.35 : p > 0.65 ? 0.7 : 1
-      ctx.font = `${size}px ${FONT}`
-      ctx.lineWidth = 4
-      ctx.strokeStyle = PAL.bg
+      if (size !== lastSize) {
+        ctx.font = `${size}px ${FONT}`
+        lastSize = size
+      }
       const y = Math.round(t.y - rise)
       if (t.sprite) {
         const { art, colors } = t.sprite

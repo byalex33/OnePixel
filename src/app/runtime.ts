@@ -52,6 +52,7 @@ export class Runtime {
   private uiTimer = 0
   private saveTimer = 0
   private seenRevision = -1
+  private seenClock = ''
   private maxSeenAt = 0
   private hiddenAt: number | null = null
   private noticeId = 1
@@ -164,13 +165,24 @@ export class Runtime {
     this.uiTimer += dt
     if (this.uiTimer >= UI_INTERVAL) {
       this.uiTimer = 0
-      if (this.game.revision !== this.seenRevision) this.bump()
+      // HUD countdowns don't touch `revision`, so also refresh when a shown second ticks over.
+      const clock = this.hudClock()
+      if (this.game.revision !== this.seenRevision || clock !== this.seenClock) {
+        this.seenClock = clock
+        this.bump()
+      }
     }
     this.saveTimer += dt
     if (this.saveTimer >= AUTOSAVE_SECONDS) {
       this.saveTimer = 0
       this.save()
     }
+  }
+
+  /** The whole seconds the HUD counts down: drone jam, boss clock, storm, and time to the next boss. */
+  private hudClock(): string {
+    const g = this.game
+    return `${Math.ceil(g.droneJam)}|${Math.ceil(g.boss?.timeLeft ?? 0)}|${Math.ceil(g.rain.remaining)}|${Math.floor(g.state.rainTimer)}|${Math.floor(g.state.bossTimer)}`
   }
 
   private handleEvents(events: GameEvent[]): void {
