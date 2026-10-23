@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { GiMusicalNotes, GiSave, GiSpeaker, GiSpeakerOff } from 'react-icons/gi'
 import { fmt, fmtTime } from '../game/format'
 import { SaveError } from '../game/save'
@@ -30,6 +30,8 @@ export function SystemTab() {
   const [msg, setMsg] = useState<{ text: string; bad?: boolean; atCode?: boolean } | null>(null)
   const [confirm, setConfirm] = useState<'import' | 'reset' | 'reboot' | null>(null)
   const [credits, setCredits] = useState(false)
+  // Stable, so Credits keeps one keydown listener instead of re-adding it on every UI refresh.
+  const closeCredits = useCallback(() => setCredits(false), [])
 
   const doExport = async () => {
     const c = rt.exportCode()
@@ -94,7 +96,10 @@ export function SystemTab() {
           {rt.canPersist ? 'Autosaves every 15s on this device.' : 'Storage is blocked. Use export to keep progress.'}
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className={`${btn} flex items-center justify-center gap-1.5`} onClick={() => setMsg({ text: rt.save() ? 'SAVED' : 'SAVE FAILED', bad: !rt.canPersist })}>
+          <button type="button" className={`${btn} flex items-center justify-center gap-1.5`} onClick={() => {
+              const ok = rt.save()
+              setMsg({ text: ok ? 'SAVED' : 'SAVE FAILED', bad: !ok })
+            }}>
             <GiSave className="size-3.5" /> SAVE
           </button>
           <button type="button" className={btn} onClick={() => void doExport()}>
@@ -175,7 +180,7 @@ export function SystemTab() {
         <button type="button" className={`${btn} w-full`} onClick={() => setCredits(true)}>
           CREDITS
         </button>
-        {credits && <Credits onClose={() => setCredits(false)} />}
+        {credits && <Credits onClose={closeCredits} />}
       </section>
 
       <section className="frame border-red/40 p-3 pt-4">

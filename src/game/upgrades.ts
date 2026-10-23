@@ -99,7 +99,3 @@ export function maxPurchase(state: SaveState, id: UpgradeId): { count: number; c
   }
   return { count, cost }
 }
-
-export function availableUpgrades(state: SaveState): UpgradeDef[] {
-  return UPGRADES.filter((d) => isUnlocked(state, d.id))
-}

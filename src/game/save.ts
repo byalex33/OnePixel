@@ -70,7 +70,7 @@ export function sanitizeState(raw: unknown): SaveState {
     out.achievements = [...new Set(raw.achievements.filter((a): a is string => typeof a === 'string' && known.has(a)))]
   }
   if (Array.isArray(raw.seenUpgrades)) {
-    out.seenUpgrades = [...new Set(raw.seenUpgrades.filter((u): u is UpgradeId => typeof u === 'string' && u in UPGRADE_MAP))]
+    out.seenUpgrades = [...new Set(raw.seenUpgrades.filter((u): u is UpgradeId => typeof u === 'string' && Object.hasOwn(UPGRADE_MAP, u)))]
   }
   if (isObj(raw.reveal)) {
     out.reveal = { hud: bool(raw.reveal.hud, false), panel: bool(raw.reveal.panel, false) }

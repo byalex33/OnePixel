@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef } from 'react'
 import { GiPadlock } from 'react-icons/gi'
+import type { Runtime } from '../app/runtime'
 import { fmt } from '../game/format'
 import { xpToNext } from '../game/formulas'
 import { upcomingUnlocks } from '../game/levels'
 import type { UpgradeId } from '../game/types'
 import { costOf, isMaxed, isUnlocked, maxPurchase, unlockLevelOf, UPGRADES, type UpgradeDef } from '../game/upgrades'
-import { useRuntime } from './hooks'
+import { useRuntime, useRuntimeSelector } from './hooks'
 import { Marquee } from './Marquee'
 import { UPGRADE_ICONS } from './icons'
 import { Segments } from './Segments'
 
-/** Tap to buy once; press and hold to keep buying. */
-function useHoldToBuy(buy: () => boolean) {
+/** Tap to buy once; press and hold to keep buying until it runs out of pixels. */
+function useHoldToBuy(buy: () => boolean, canBuy: () => boolean) {
   const timer = useRef<number | null>(null)
   const repeated = useRef(false)
   const stop = useCallback(() => {
@@ -23,9 +24,12 @@ function useHoldToBuy(buy: () => boolean) {
     onPointerDown: () => {
       repeated.current = false
       stop()
+      // Stop quietly when the money runs out; only a plain tap that fails plays the "denied" sound.
       const step = () => {
+        timer.current = null
+        if (!canBuy()) return
         repeated.current = true
-        timer.current = buy() ? window.setTimeout(step, 85) : null
+        if (buy()) timer.current = window.setTimeout(step, 85)
       }
       timer.current = window.setTimeout(step, 380)
     },
@@ -42,8 +46,14 @@ function useHoldToBuy(buy: () => boolean) {
   }
 }
 
-function UpgradeRow({ def }: { def: UpgradeDef }) {
-  const rt = useRuntime()
+/** Everything a row shows. The row only re-renders when this changes, not on every UI refresh. */
+function rowKey(rt: Runtime, id: UpgradeId): string {
+  const s = rt.game.state
+  return `${s.upgrades[id]}|${s.reboots}|${s.pixels >= costOf(id, s.upgrades[id], s.reboots)}|${s.seenUpgrades.includes(id)}|${maxPurchase(s, id).count}`
+}
+
+const UpgradeRow = memo(function UpgradeRow({ def }: { def: UpgradeDef }) {
+  const rt = useRuntimeSelector((r) => rowKey(r, def.id))
   const s = rt.game.state
   const lvl = s.upgrades[def.id]
   const maxed = isMaxed(s, def.id)
@@ -51,7 +61,10 @@ function UpgradeRow({ def }: { def: UpgradeDef }) {
   const afford = !maxed && s.pixels >= cost
   const isNew = lvl === 0 && !s.seenUpgrades.includes(def.id)
   const Icon = UPGRADE_ICONS[def.id]
-  const handlers = useHoldToBuy(() => rt.buy(def.id as UpgradeId))
+  const handlers = useHoldToBuy(
+    () => rt.buy(def.id),
+    () => rt.game.canBuy(def.id),
+  )
   const bulk = maxPurchase(s, def.id)
   const showMax = !maxed && def.max > 1
 
@@ -125,7 +138,7 @@ function UpgradeRow({ def }: { def: UpgradeDef }) {
       {isNew && <span className="anim-blink absolute -top-2 right-2 bg-gold px-1 font-pixel text-[7px] leading-3 text-bg">NEW</span>}
     </div>
   )
-}
+})
 
 export function UpgradesTab() {
   const rt = useRuntime()

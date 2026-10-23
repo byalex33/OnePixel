@@ -15,6 +15,17 @@ export function useRuntime(): Runtime {
   return rt
 }
 
+/**
+ * Like `useRuntime`, but only re-renders when `select` returns something new.
+ * `select` must return a primitive (a string key is handy) so equal snapshots compare equal.
+ */
+export function useRuntimeSelector(select: (rt: Runtime) => string | number | boolean): Runtime {
+  const rt = useContext(RuntimeContext)
+  if (!rt) throw new Error('RuntimeContext missing')
+  useSyncExternalStore(rt.subscribe, () => select(rt))
+  return rt
+}
+
 export function useMediaQuery(query: string): boolean {
   const [match, setMatch] = useState(() => matchMedia(query).matches)
   useEffect(() => {

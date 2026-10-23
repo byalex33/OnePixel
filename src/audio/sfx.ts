@@ -57,7 +57,8 @@ export class Sfx {
   /** Must be called from a user gesture (browser autoplay policy). */
   unlock(): void {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume()
+      // Safari can also leave it 'interrupted' after a phone call or Siri.
+      if (this.ctx.state !== 'running') void this.ctx.resume()
       return
     }
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -315,6 +316,8 @@ export class Sfx {
     const t = ctx.currentTime + delay
     const src = ctx.createBufferSource()
     src.buffer = this.noiseBuf
+    // The buffer is one second long; without looping, the longer cues (nuke, bosses) cut off early.
+    src.loop = true
     const filter = ctx.createBiquadFilter()
     filter.type = 'lowpass'
     filter.frequency.setValueAtTime(cutoff, t)

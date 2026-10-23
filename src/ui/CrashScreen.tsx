@@ -40,9 +40,10 @@ function Crash() {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
-    const id = window.setInterval(() => setStep((n) => (n >= PROGRESS.length ? n : n + 1)), STEP_MS)
-    return () => window.clearInterval(id)
-  }, [])
+    if (step >= PROGRESS.length) return
+    const id = window.setTimeout(() => setStep(step + 1), STEP_MS)
+    return () => window.clearTimeout(id)
+  }, [step])
 
   const glitching = step < 2 && s.settings.flash
   const pct = PROGRESS[Math.min(step, PROGRESS.length - 1)]
