@@ -489,6 +489,27 @@ describe('combat mechanics', () => {
     expect(g.frenzy).toBeGreaterThan(0)
   })
 
+  it('keeps the boss clock running through a nuke warm-up, but surfaces the boss only after the blast', () => {
+    const g = makeGame((s) => {
+      s.level = 20
+      s.upgrades.nukeCharge = 1
+      s.bossTimer = 10
+    })
+    g.state.nukeCharge = g.stats.nukeKills
+    expect(g.launchNuke()).toBe(true)
+    run(g, C.NUKE_WARMUP + 0.05)
+    expect(g.state.bossTimer).toBeCloseTo(10 - C.NUKE_WARMUP - 0.05, 1)
+
+    g.state.bossTimer = 0.5
+    g.state.nukeCharge = g.stats.nukeKills
+    expect(g.launchNuke()).toBe(true)
+    run(g, 0.6)
+    expect(g.state.bossTimer).toBe(0)
+    expect(g.boss).toBeNull()
+    run(g, C.NUKE_WARMUP)
+    expect(g.boss).not.toBeNull()
+  })
+
   it('auto-launches the nuke only once NUKE SILO is maxed and the switch is on', () => {
     const charged = (level: number, autoNuke: boolean) => {
       const g = makeGame((s) => {
