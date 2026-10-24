@@ -1392,9 +1392,9 @@ export class Game {
   private updateBoss(dt: number): void {
     const b = this.boss
     if (!b) {
-      if (!hasFeature(this.state.level, 'boss') || this.nuke) return
+      if (!hasFeature(this.state.level, 'boss')) return
       this.state.bossTimer = Math.max(0, this.state.bossTimer - dt)
-      if (this.state.bossTimer <= 0) this.spawnBoss()
+      if (this.state.bossTimer <= 0 && !this.nuke) this.spawnBoss()
       return
     }
     if (b.phase === 'rise') {
