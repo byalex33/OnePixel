@@ -116,6 +116,8 @@ export const FINAL_EAT_HEAL = 0.0025
 export const FINAL_ESCAPE_RECOVER = 0.05
 /** A nuke takes a fair chunk, once per fight. */
 export const FINAL_NUKE_FRACTION = 0.1
+/** AUTO holds its nuke once PIXEL ZERO is closer than this many recharge times, so a slow patch can't strand it empty. */
+export const FINAL_HOLD_MARGIN = 2
 /** Bombs and lasers hit PIXEL ZERO much harder than regular bosses, so the machines pull their weight. */
 export const FINAL_MACHINE_MULT: Partial<Record<'bomb' | 'bomblet' | 'laser', number>> = { bomb: 8, bomblet: 8, laser: 4 }
 export const FINAL_REWARD_VALUE = 2000

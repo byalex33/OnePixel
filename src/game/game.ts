@@ -121,6 +121,8 @@ const autoCanTake = (p: Pixel) => p.kind !== 'golden' && p.kind !== 'rainbow'
 const BOSS_TARGET = -1
 const EARN_BINS = 10
 const EARN_BIN_SECONDS = 0.5
+/** Nuke-charging kills are averaged over a longer window, so the post-nuke frenzy does not skew AUTO's estimate. */
+const KILL_BINS = 20
 
 /**
  * The whole simulation. Pure TypeScript, no DOM, no React. The renderer reads
@@ -169,6 +171,7 @@ export class Game {
   private achTimer = 0
   private earnBins: number[] = new Array(EARN_BINS).fill(0)
   private earnBinT = 0
+  private killBins: number[] = new Array(KILL_BINS).fill(0)
   /** Increments whenever something the UI shows changes. */
   revision = 0
 
@@ -342,14 +345,24 @@ export class Game {
     return this.state.stats.bossKills - this.state.lastFinalAt >= C.FINAL_EVERY
   }
 
+  /** Kills per second that charge the nuke, averaged over the last few seconds. */
+  get chargeRate(): number {
+    let sum = 0
+    for (const b of this.killBins) sum += b
+    return sum / (KILL_BINS * EARN_BIN_SECONDS)
+  }
+
   /**
-   * AUTO keeps a charged nuke back while PIXEL ZERO is due or not yet fighting. Its lockdown means no kills,
-   * so nothing can charge the nuke during the fight; this way AUTO still lands its one nuke hit.
+   * AUTO keeps a charged nuke back for PIXEL ZERO. Its lockdown means no kills, so nothing can charge the nuke
+   * during the fight; this way AUTO still lands its one nuke hit. While it is still far off, AUTO keeps firing
+   * as long as the current kill rate would charge the nuke again before it surfaces.
    */
   get holdNukeForFinal(): boolean {
     const b = this.boss
     if (b) return b.final && b.phase !== 'fight'
-    return this.finalDue && hasFeature(this.state.level, 'boss')
+    if (!this.finalDue || !hasFeature(this.state.level, 'boss')) return false
+    const recharge = C.NUKE_WARMUP + this.stats.nukeKills / this.chargeRate
+    return this.state.bossTimer <= recharge * C.FINAL_HOLD_MARGIN
   }
 
   /** What surfaces next and when, for the HUD. Null before bosses unlock or while one is up. */
@@ -474,6 +487,8 @@ export class Game {
       this.earnBinT -= EARN_BIN_SECONDS
       this.earnBins.pop()
       this.earnBins.unshift(0)
+      this.killBins.pop()
+      this.killBins.unshift(0)
     }
 
     this.achTimer -= dt
@@ -562,6 +577,7 @@ export class Game {
 
     if (s.nukeEnabled && !this.nuke && cause !== 'nuke') {
       this.state.nukeCharge = Math.min(s.nukeKills, this.state.nukeCharge + 1)
+      this.killBins[0]++
     }
 
     const g = this.groups.get(group)

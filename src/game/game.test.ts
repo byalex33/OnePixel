@@ -1014,6 +1014,32 @@ describe('PIXEL ZERO, the final boss', () => {
     expect(b.hp).toBeLessThanOrEqual(b.maxHp * (1 - C.FINAL_NUKE_FRACTION) + 1)
   })
 
+  it('AUTO keeps firing while PIXEL ZERO is far enough off to charge the nuke again', () => {
+    const g = makeGame((s) => {
+      s.level = 20
+      s.stats.bossKills = C.FINAL_EVERY
+      s.bossTimer = C.BOSS_INTERVAL
+      s.upgrades.nukeCharge = UPGRADE_MAP.nukeCharge.max
+      s.settings.autoNuke = true
+    })
+    expect(g.holdNukeForFinal).toBe(true) // no kills yet, so no telling how fast it would recharge
+
+    // A steady kill rate that charges the nuke in a few seconds.
+    for (let i = 0; i < 40; i++) {
+      for (let k = 0; k < 10; k++) {
+        addPixel(g, 50, 50)
+        g.pointerDown(50, 50)
+      }
+      run(g, 0.25)
+      if (g.nuke) break
+    }
+    expect(g.chargeRate).toBeGreaterThan(0)
+    expect(g.nuke).not.toBeNull()
+
+    g.state.bossTimer = 1
+    expect(g.holdNukeForFinal).toBe(true)
+  })
+
   it('pays no offline progress behind the crash screen or during its lockdown', () => {
     const drones = (s: SaveState) => {
       s.level = 20
