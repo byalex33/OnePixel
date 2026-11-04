@@ -1,4 +1,5 @@
 import { UPGRADES_UNLOCK_LEVEL } from './config'
+import { branchComplete, BRANCHES, installedCount, KERNEL } from './kernel'
 import type { SaveState } from './types'
 
 export interface AchievementDef {
@@ -40,4 +41,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'boss5', name: 'BOSS RUSH', desc: 'Defeat 5 bosses.', check: (s) => s.stats.bossKills >= 5, hidden: true },
   { id: 'final', name: 'SYSTEM CRASH', desc: 'Destroy PIXEL ZERO.', check: (s) => s.stats.finalKills >= 1, hidden: true },
   { id: 'reboot', name: 'OFF AND ON AGAIN', desc: 'Reboot the system.', check: (s) => s.reboots >= 1, hidden: true },
+  { id: 'kernel', name: 'ROOT SHELL', desc: 'Install your first KERNEL node.', check: (s) => installedCount(s) >= 1, hidden: true },
+  { id: 'glitch', name: 'SEGFAULT', desc: 'Catch 10 glitch pixels.', check: (s) => s.stats.glitchKills >= 10, hidden: true },
+  { id: 'branch', name: 'FULL STACK', desc: 'Max out a whole KERNEL branch.', check: (s) => BRANCHES.some((b) => branchComplete(s, b.id)), hidden: true },
+  { id: 'kernelAll', name: 'KERNEL COMPLETE', desc: 'Max out every KERNEL node.', check: (s) => KERNEL.every((d) => s.kernel[d.id] >= d.costs.length), hidden: true },
 ]

@@ -1,4 +1,5 @@
-import { BLUE_LEVEL, COMBO_STEP, FINAL_HP, REBOOT_BOSS_HP_MULT, REBOOT_PRICE_MULT, REBOOT_VALUE_MULT } from './config'
+import { BLUE_LEVEL, COMBO_STEP, COMBO_WINDOW, FINAL_EVERY, FINAL_HP, REBOOT_BOSS_HP_MULT, REBOOT_PRICE_MULT, REBOOT_VALUE_MULT } from './config'
+import { GLITCH_CHANCE, OVERFLOW_KEEP, PANIC_EVERY, rootAccess, xpBoost } from './kernel'
 import { hasFeature } from './levels'
 import type { FeatureId, SaveState, UpgradeId } from './types'
 
@@ -98,10 +99,30 @@ export interface Stats {
   nukeYield: number
   /** Multiplier on every hit against the boss. */
   bossDamage: number
+  // KERNEL effects
+  /** Seconds a combo survives without a hit; Infinity with STICKY COMBO 2 (then only a miss breaks it). */
+  comboWindow: number
+  /** Odds a respawn comes back as a glitch pixel. */
+  glitchChance: number
+  /** Drones may take golden pixels. */
+  goldMagnet: boolean
+  /** Resting pixels drift towards the last tap. */
+  magnet: boolean
+  /** Share of the nuke's charge kept after it fires. */
+  nukeKeep: number
+  /** Rainbow pixels keep spawning during rainbow mode, and stack their time. */
+  doubleRainbow: boolean
+  /** AUTO nuke is offered from NUKE SILO level 1. */
+  autoLaunch: boolean
+  /** The auto-buyer is installed. */
+  script: boolean
+  /** Regular boss kills between PIXEL ZEROs. */
+  finalEvery: number
 }
 
 export function computeStats(s: SaveState): Stats {
   const u = s.upgrades
+  const k = s.kernel
   // Feature gates guard against hand-edited saves; normally the shop enforces them.
   const has = (id: UpgradeId, feature: FeatureId) => u[id] > 0 && hasFeature(s.level, feature)
   const oc = has('overclock', 'overclock') ? OVERCLOCK : 1
@@ -109,7 +130,7 @@ export function computeStats(s: SaveState): Stats {
     respawnTime: respawnTime(u.respawn),
     maxPixels: 1 + (has('multi', 'second') ? u.multi : 0),
     value: valueMult(u.value) * levelBonus(s.level) * achievementBonus(s.achievements.length) * bossBonus(s.stats.bossKills) * rebootValueMult(s.reboots),
-    xpPerKill: xpMult(u.xp) * lateXpBonus(s.level),
+    xpPerKill: xpMult(u.xp) * lateXpBonus(s.level) * xpBoost(k.xpBoost),
     critChance: has('critChance', 'crit') ? critChance(u.critChance) : 0,
     critMult: critMult(u.critPower),
     comboCap: has('combo', 'combo') ? comboCap(u.combo) : 0,
@@ -135,6 +156,15 @@ export function computeStats(s: SaveState): Stats {
     nukeEnabled: has('nukeCharge', 'nuke'),
     nukeKills: has('nukeCharge', 'nuke') ? nukeKills(u.nukeCharge) : Infinity,
     nukeYield: nukeYield(u.nukeYield),
-    bossDamage: has('pierce', 'boss') ? pierceMult(u.pierce) : 1,
+    bossDamage: (has('pierce', 'boss') ? pierceMult(u.pierce) : 1) * rootAccess(k.rootAccess),
+    comboWindow: k.stickyCombo >= 2 ? Infinity : COMBO_WINDOW * (k.stickyCombo >= 1 ? 2 : 1),
+    glitchChance: GLITCH_CHANCE[k.glitch] ?? 0,
+    goldMagnet: k.goldMagnet > 0,
+    magnet: k.magnet > 0,
+    nukeKeep: k.overflow > 0 ? OVERFLOW_KEEP : 0,
+    doubleRainbow: k.doubleRainbow > 0,
+    autoLaunch: k.autoLaunch > 0,
+    script: k.script > 0,
+    finalEvery: k.kernelPanic > 0 ? PANIC_EVERY : FINAL_EVERY,
   }
 }

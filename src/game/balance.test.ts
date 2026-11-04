@@ -181,3 +181,57 @@ describe('late-game pacing', () => {
     for (const { name, maxGap } of reports) expect(maxGap, name).toBeLessThan(15 * 60)
   })
 })
+
+/*
+ * The REBOOT ladder: PIXEL ZERO, REBOOT, spend the CORE BITS in the KERNEL, again and again.
+ * Each REBOOT makes prices x2 and bosses x1.6 tougher; the KERNEL has to more than make up
+ * for it, so every run should be quicker than the last and PIXEL ZERO should never become a wall.
+ */
+const LADDER_REBOOTS = 5
+const LADDER: [string, BotOptions][] = [
+  ['human', { cps: 1.5, reaction: 0.8, nukeDelay: 30, saveFor: LATE, seconds: 9 * 3600, seed: 7, reboots: LADDER_REBOOTS }],
+  ['no-nuke', { cps: 1, reaction: 1.2, nukeDelay: Infinity, saveFor: LATE, seconds: 12 * 3600, seed: 11, reboots: LADDER_REBOOTS }],
+]
+
+describe('reboot ladder', () => {
+  const ladders = LADDER.map(([name, opts]) => ({ name, r: runBot(opts) }))
+
+  it('prints the ladder', () => {
+    for (const { name, r } of ladders) {
+      console.log(
+        [
+          `${name}:`,
+          ...r.runs.map(
+            (run, i) =>
+              `  run ${i}: L20 ${run.l20 === null ? '-' : fmtTime(run.l20)}, PIXEL ZERO ${run.zero === null ? 'never' : fmtTime(run.zero)}, ${run.escapes} escapes, +${run.bits} bits, bank ${run.bank}, bought ${run.bought.join(' ') || '-'}`,
+          ),
+        ].join('\n'),
+      )
+    }
+    expect(true).toBe(true)
+  })
+
+  it('every run up to the last reboot brings PIXEL ZERO down', () => {
+    for (const { name, r } of ladders) {
+      const runs = r.runs.slice(0, LADDER_REBOOTS + 1)
+      expect(runs.length, name).toBe(LADDER_REBOOTS + 1)
+      for (const [i, run] of runs.entries()) expect(run.zero, `${name} run ${i}`).not.toBeNull()
+    }
+  })
+
+  it('each run is quicker than the one before', () => {
+    for (const { name, r } of ladders) {
+      const times = r.runs.map((run) => run.zero ?? Infinity)
+      for (let i = 1; i <= LADDER_REBOOTS; i++) expect(times[i], `${name} run ${i}`).toBeLessThan(times[i - 1])
+    }
+  })
+
+  it('every REBOOT pays enough bits to install something', () => {
+    for (const { name, r } of ladders) {
+      for (const [i, run] of r.runs.slice(0, LADDER_REBOOTS).entries()) {
+        expect(run.bits, `${name} run ${i}`).toBeGreaterThanOrEqual(10)
+        expect(run.bought.length, `${name} run ${i}`).toBeGreaterThan(0)
+      }
+    }
+  })
+})

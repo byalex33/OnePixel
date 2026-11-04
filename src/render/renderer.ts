@@ -1,7 +1,7 @@
 import * as C from '../game/config'
 import { fmt } from '../game/format'
 import type { Game } from '../game/game'
-import type { GameEvent } from '../game/types'
+import type { GameEvent, GlitchCopy } from '../game/types'
 import { buildField, paintField, sceneryStage, type DotField } from './dotfield'
 import { C_BLUE, C_CYAN, C_DARK, C_GOLD, C_GREEN, C_LIGHT, C_MID, C_ORANGE, C_PINK, C_RAINBOW, C_RED, C_VIOLET, C_WHITE, PAL, rainbowHue } from './palette'
 import { Particles } from './particles'
@@ -59,6 +59,11 @@ interface Absorb {
 
 const FONT = '"Press Start 2P", ui-monospace, monospace'
 const MAX_TEXTS = 40
+/** Glitch pixels flicker between every special's colour. */
+const GLITCH_FILLS = [PAL.white, PAL.cyan, PAL.gold, PAL.pink, PAL.blue, PAL.white, PAL.green]
+const GLITCH_COLORS = [C_CYAN, C_PINK, C_WHITE, C_GOLD, C_BLUE, C_GREEN]
+const GLITCH_LABEL: Record<GlitchCopy, string> = { golden: 'GLITCH: GOLD', blue: 'GLITCH: BLUE', rainbow: 'GLITCH: RAINBOW', bomb: 'GLITCH: BOMB' }
+
 /** Rainbow colours by whole degree, so a busy rainbow frame reuses strings instead of building hundreds. */
 const HUES = Array.from({ length: 360 }, (_, h) => `hsl(${h} 100% 62%)`)
 
@@ -252,10 +257,19 @@ export class Renderer {
           if (!this.lowFx || this.game.pixels.length < 6) {
             const x = e.x * this.scale
             const y = e.y * this.scale
-            this.particles.burst(x, y, 4, 40 * this.k, 0.35, 2, e.kind === 'golden' ? [C_GOLD] : e.kind === 'blue' ? [C_BLUE, C_CYAN] : e.kind === 'rainbow' ? C_RAINBOW : [C_LIGHT, C_MID])
+            this.particles.burst(
+              x,
+              y,
+              4,
+              40 * this.k,
+              0.35,
+              2,
+              e.kind === 'golden' ? [C_GOLD] : e.kind === 'blue' ? [C_BLUE, C_CYAN] : e.kind === 'rainbow' ? C_RAINBOW : e.kind === 'glitch' ? GLITCH_COLORS : [C_LIGHT, C_MID],
+            )
           }
           if (e.kind === 'golden') this.ring(e.x * this.scale, e.y * this.scale, this.ps * 2.5, 0.4, PAL.gold, true, true)
           if (e.kind === 'rainbow') this.ring(e.x * this.scale, e.y * this.scale, this.ps * 3, 0.5, PAL.white, true, true)
+          if (e.kind === 'glitch') this.ring(e.x * this.scale, e.y * this.scale, this.ps * 2.5, 0.3, PAL.cyan, false, true)
           break
         case 'rainbow-start':
           this.rainbowFx()
@@ -378,7 +392,9 @@ export class Renderer {
     const rainbow = e.kind === 'rainbow' || this.game.rainbow > 0
     const colors = rainbow
       ? [...C_RAINBOW]
-      : e.kind === 'golden'
+      : e.kind === 'glitch'
+        ? [...GLITCH_COLORS]
+        : e.kind === 'golden'
         ? [C_GOLD, C_GOLD, C_WHITE, C_ORANGE]
         : e.kind === 'blue'
           ? [C_BLUE, C_BLUE, C_CYAN, C_WHITE]
@@ -398,7 +414,16 @@ export class Renderer {
     this.ring(x, y, ps * (e.crit ? 3 : manual ? 2.2 : 1.5), e.crit ? 0.32 : 0.2, e.crit ? PAL.red : PAL.white, e.crit || (manual && !many), false)
     if (e.combo >= 20 && !many) this.ring(x, y, ps * 2.8, 0.28, PAL.cyan, false, true)
 
-    if (e.crit) {
+    if (e.kind === 'glitch') {
+      // A glitch reads as a burst of corrupted colour, then says what it copied.
+      this.addTrauma(0.2)
+      this.freeze = Math.max(this.freeze, 0.04)
+      this.particles.burst(x, y, this.lowFx ? 14 : 30, 260 * k, 0.8, size, GLITCH_COLORS, 180 * k)
+      this.ring(x, y, ps * 2.6, 0.25, PAL.cyan, true, false)
+      this.text(x, y - ps * 1.4, GLITCH_LABEL[e.copy ?? 'golden'], PAL.cyan, 9, 1)
+      if (e.copy === 'blue') this.text(x, y - ps * 0.4, `+${fmt(e.xp)} XP`, PAL.blue, 12, 1.1)
+      else this.text(x, y - ps * 0.4, `+${fmt(e.amount)}`, e.copy === 'golden' ? PAL.gold : PAL.white, 13, 1.1)
+    } else if (e.crit) {
       this.addTrauma(0.22)
       this.freeze = Math.max(this.freeze, 0.045)
       this.text(x, y - ps * 1.4, 'CRIT!', PAL.red, 10, 0.7)
@@ -735,6 +760,35 @@ export class Renderer {
     ctx.globalAlpha = 1
   }
 
+  /** A glitch pixel: it can't decide what it is. Colour flickers, it jitters sideways and splits into RGB ghosts. */
+  private drawGlitch(id: number, x: number, y: number, s: number, dt: number): void {
+    const ctx = this.ctx
+    const frame = Math.floor(this.time * 14 + id)
+    const color = GLITCH_FILLS[frame % GLITCH_FILLS.length]
+    const jitter = frame % 5 === 0 ? Math.round((((frame * 7) % 3) - 1) * s * 0.5) : 0
+    const gx = Math.round(x - s / 2) + jitter
+    const gy = Math.round(y - s / 2)
+    const glow = Math.round(s * 2.6)
+    ctx.globalAlpha = 0.14
+    ctx.fillStyle = PAL.cyan
+    ctx.fillRect(Math.round(x - glow / 2), Math.round(y - glow / 2), glow, glow)
+    const split = Math.max(1, Math.round(s * 0.3))
+    ctx.globalAlpha = 0.55
+    ctx.fillStyle = PAL.red
+    ctx.fillRect(gx - split, gy, s, s)
+    ctx.fillStyle = PAL.cyan
+    ctx.fillRect(gx + split, gy, s, s)
+    ctx.globalAlpha = 1
+    ctx.fillStyle = color
+    ctx.fillRect(gx, gy, s, s)
+    // Now and then a scanline tears off the side.
+    if (frame % 7 === 0) ctx.fillRect(gx + s, gy + Math.round(s * 0.4), Math.round(s * 0.8), Math.max(1, Math.round(s * 0.2)))
+    if (Math.random() < dt * 10) {
+      const c = GLITCH_COLORS[(Math.random() * GLITCH_COLORS.length) | 0]
+      this.particles.add(x + (Math.random() - 0.5) * s * 2.4, y + (Math.random() - 0.5) * s * 2.4, (Math.random() - 0.5) * 30, 0, 0.3, 2, c)
+    }
+  }
+
   private drawPixels(dt: number): void {
     const ctx = this.ctx
     const base = this.ps
@@ -747,8 +801,12 @@ export class Renderer {
       const breathe = 1 + 0.05 * Math.sin(this.time * 4 + p.id)
       const s = Math.max(2, Math.round(base * pop * breathe))
       const golden = p.kind === 'golden'
-      const special = golden || p.kind === 'rainbow'
+      const special = golden || p.kind === 'rainbow' || p.kind === 'glitch'
       if (special && p.life < 1.6 && Math.floor(this.time * 12) % 2 === 0) continue
+      if (p.kind === 'glitch') {
+        this.drawGlitch(p.id, x, y, s, dt)
+        continue
+      }
 
       const blue = p.kind === 'blue'
       const rainbow = p.kind === 'rainbow' || this.game.rainbow > 0

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef } from 'react'
-import { GiPadlock } from 'react-icons/gi'
+import { GiPadlock, GiScrollUnfurled } from 'react-icons/gi'
 import type { Runtime } from '../app/runtime'
 import { fmt } from '../game/format'
 import { xpToNext } from '../game/formulas'
@@ -150,6 +150,19 @@ export function UpgradesTab() {
 
   return (
     <div className="space-y-3">
+      {rt.game.stats.script && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={s.settings.autoBuy}
+          onClick={() => rt.setSetting('autoBuy', !s.settings.autoBuy)}
+          className={`frame flex w-full items-center gap-3 p-2.5 text-left ${s.settings.autoBuy ? 'border-cyan/60' : ''}`}
+        >
+          <GiScrollUnfurled className={`size-5 shrink-0 ${s.settings.autoBuy ? 'text-cyan' : 'text-mute'}`} />
+          <span className="font-pixel text-[9px] text-hi">[{s.settings.autoBuy ? 'X' : ' '}]</span>
+          <span className={`font-pixel text-[8px] leading-relaxed ${s.settings.autoBuy ? 'text-cyan' : 'text-dim'}`}>SCRIPT: AUTO-BUY CHEAPEST</span>
+        </button>
+      )}
       {next && (
         <div className="frame p-2.5 pt-3.5">
           <span className="frame-title">NEXT UNLOCK</span>

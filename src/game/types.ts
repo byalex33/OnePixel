@@ -46,6 +46,26 @@ export type FeatureId =
 
 export type UpgradeLevels = Record<UpgradeId, number>
 
+/** KERNEL nodes, bought with CORE BITS between runs (see kernel.ts). */
+export type KernelId =
+  | 'xpBoost'
+  | 'fastBoot'
+  | 'starterKit'
+  | 'cachedPerks'
+  | 'bitMiner'
+  | 'script'
+  | 'stickyCombo'
+  | 'goldMagnet'
+  | 'autoLaunch'
+  | 'doubleRainbow'
+  | 'rootAccess'
+  | 'magnet'
+  | 'overflow'
+  | 'glitch'
+  | 'kernelPanic'
+
+export type KernelLevels = Record<KernelId, number>
+
 export interface LifetimeStats {
   kills: number
   clicks: number
@@ -53,6 +73,7 @@ export interface LifetimeStats {
   crits: number
   goldenKills: number
   blueKills: number
+  glitchKills: number
   droneKills: number
   bombKills: number
   laserKills: number
@@ -82,6 +103,8 @@ export interface Settings {
   /** Full-screen colour flashes on big hits, kills and level-ups, and the crash screen's black flicker. */
   flash: boolean
   haptics: boolean
+  /** The SCRIPT kernel node's auto-buyer. Only does anything once SCRIPT is installed. */
+  autoBuy: boolean
 }
 
 /** Everything that persists between sessions. Entities on screen are transient. */
@@ -112,9 +135,20 @@ export interface SaveState {
   reboots: number
   /** PIXEL ZERO is dead and the crash screen is waiting for REBOOT or CONTINUE. */
   crashPending: boolean
+  /** CORE BITS in the bank, to spend in the KERNEL. Earned by REBOOT and never reset. */
+  bits: number
+  kernel: KernelLevels
+  /** REBOOT was chosen and its bits paid: the KERNEL boot screen is up, waiting for BOOT. */
+  bootPending: boolean
+  /** Seconds played this run, offline time included. */
+  runTime: number
+  /** runTime when PIXEL ZERO first died this run, or 0 if it hasn't yet. Sets the speed bonus. */
+  zeroTime: number
 }
 
-export type PixelKind = 'normal' | 'golden' | 'blue' | 'rain' | 'rainbow'
+export type PixelKind = 'normal' | 'golden' | 'blue' | 'rain' | 'rainbow' | 'glitch'
+/** What a glitch pixel copies: the last special the player hit. */
+export type GlitchCopy = 'golden' | 'blue' | 'rainbow' | 'bomb'
 export type Cause = 'click' | 'drone' | 'chain' | 'bomb' | 'laser' | 'nuke'
 export type BossDamageSource = Exclude<Cause, 'nuke'> | 'bomblet'
 
@@ -129,6 +163,8 @@ export type GameEvent =
       crit: boolean
       cause: Cause
       combo: number
+      /** For a glitch pixel, the special it copied. */
+      copy?: GlitchCopy
     }
   | { type: 'spawn'; x: number; y: number; kind: PixelKind }
   | { type: 'miss'; x: number; y: number }
@@ -159,5 +195,6 @@ export type GameEvent =
   | { type: 'final-surfaced'; x: number; y: number }
   | { type: 'levelup'; level: number }
   | { type: 'achievement'; id: string }
-  | { type: 'buy'; id: UpgradeId; level: number }
+  | { type: 'buy'; id: UpgradeId; level: number; auto?: boolean }
+  | { type: 'kernel'; id: KernelId; level: number }
   | { type: 'denied' }

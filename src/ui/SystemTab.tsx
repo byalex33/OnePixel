@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 import { GiMusicalNotes, GiSave, GiSpeaker, GiSpeakerOff } from 'react-icons/gi'
+import { REBOOT_BOSS_HP_MULT, REBOOT_PRICE_MULT, REBOOT_VALUE_MULT } from '../game/config'
 import { fmt, fmtTime } from '../game/format'
+import { bitsForRun } from '../game/kernel'
 import { SaveError } from '../game/save'
 import type { Settings } from '../game/types'
 import { Credits } from './Credits'
@@ -76,6 +78,8 @@ export function SystemTab() {
   if (bossesMet > 0) rows.push(['BOSSES', `${fmt(st.bossKills)} / ${fmt(bossesMet)}`])
   if (st.finalKills > 0) rows.push(['PIXEL ZERO', fmt(st.finalKills)])
   if (s.reboots > 0) rows.push(['REBOOTS', fmt(s.reboots)])
+  if (s.reboots > 0 || s.bits > 0) rows.push(['CORE BITS', fmt(s.bits)])
+  if (st.glitchKills > 0) rows.push(['GLITCHES', fmt(st.glitchKills)])
 
   const message = msg && <div className={`font-pixel text-[8px] leading-relaxed ${msg.bad ? 'text-red' : 'text-gold'}`}>&gt; {msg.text}</div>
 
@@ -149,7 +153,7 @@ export function SystemTab() {
         <section className="frame border-cyan/50 p-3 pt-4">
           <span className="frame-title text-cyan!">REBOOT</span>
           <div className="text-[17px] leading-tight text-dim">
-            Start over at level 1, keeping your feats. Prices x2 and bosses x1.6 tougher than now, but every pixel is worth x2.5 more. Forever.
+            Collect {bitsForRun(s).total} CORE BITS for the KERNEL, then start over keeping your feats. Prices x{REBOOT_PRICE_MULT} and bosses x{REBOOT_BOSS_HP_MULT} tougher than now, but every pixel is worth x{REBOOT_VALUE_MULT} more. Forever.
           </div>
           {confirm === 'reboot' ? (
             <div className="mt-2 grid grid-cols-2 gap-2">

@@ -25,7 +25,24 @@ import {
   GiTimeBomb,
   GiTwoCoins,
 } from 'react-icons/gi'
-import type { UpgradeId } from '../game/types'
+import {
+  GiBackpack,
+  GiChest,
+  GiCrackedGlass,
+  GiFastForwardButton,
+  GiGoldMine,
+  GiKey,
+  GiLever,
+  GiMagnet,
+  GiMining,
+  GiNetworkBars,
+  GiScrollUnfurled,
+  GiSkullCrack,
+  GiStarSwirl,
+  GiStickyBoot,
+  GiWaterDrop,
+} from 'react-icons/gi'
+import type { KernelId, UpgradeId } from '../game/types'
 
 export const UPGRADE_ICONS: Record<UpgradeId, IconType> = {
   respawn: GiHourglass,
@@ -52,4 +69,22 @@ export const UPGRADE_ICONS: Record<UpgradeId, IconType> = {
   rainbow: GiRainbowStar,
   blue: GiCrystalShine,
   pierce: GiCrackedShield,
+}
+
+export const KERNEL_ICONS: Record<KernelId, IconType> = {
+  xpBoost: GiNetworkBars,
+  fastBoot: GiFastForwardButton,
+  starterKit: GiBackpack,
+  cachedPerks: GiChest,
+  bitMiner: GiMining,
+  script: GiScrollUnfurled,
+  stickyCombo: GiStickyBoot,
+  goldMagnet: GiGoldMine,
+  autoLaunch: GiLever,
+  doubleRainbow: GiStarSwirl,
+  rootAccess: GiKey,
+  magnet: GiMagnet,
+  overflow: GiWaterDrop,
+  glitch: GiCrackedGlass,
+  kernelPanic: GiSkullCrack,
 }

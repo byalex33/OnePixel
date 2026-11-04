@@ -49,6 +49,21 @@ export const LASER_WIDTH = 5
 export const RAIN_RATE = 9 // pixels per second
 export const RAIN_SPEED = 34
 
+/** DOUBLE RAINBOW stacks rainbow mode up to this many rainbows' worth of time. */
+export const RAINBOW_STACK_MAX = 3
+
+/** GLITCH PIXEL copying a bomb: a short beat before the blast. */
+export const GLITCH_BOMB_DELAY = 0.05
+
+/** MAGNET: resting pixels within range drift towards the last tap, stopping on a ring around it. */
+export const MAGNET_RANGE = 70
+export const MAGNET_RING = 7
+export const MAGNET_SPEED = 14
+
+/** SCRIPT: the auto-buyer checks this often and buys up to a batch at a time. */
+export const AUTO_BUY_INTERVAL = 0.5
+export const AUTO_BUY_BATCH = 10
+
 export const NUKE_WARMUP = 1.3
 export const FRENZY_TIME = 6
 export const FRENZY_RESPAWN_MULT = 0.08
@@ -58,7 +73,7 @@ export const MIN_OFFLINE_SECONDS = 30
 export const OFFLINE_EFFICIENCY = 0.5
 
 export const SAVE_KEY = 'onepixel.save'
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 export const AUTOSAVE_SECONDS = 15
 
 /** The boss: a giant stuck pixel that surfaces from beneath the grid at level 20. */
@@ -135,7 +150,7 @@ export const FINAL_EMP_JAM = 5
 export const FINAL_CORE_RADIUS = 6
 export const FINAL_CORE_MULT = 3
 
-/** Each REBOOT (prestige): prices x2 and bosses x1.6 tougher, but pixels are worth x2.5 more, for good. */
+/** Each REBOOT (prestige): prices x2 and bosses x1.25 tougher, but pixels are worth x2.5 more, for good. The KERNEL makes up the rest. */
 export const REBOOT_PRICE_MULT = 2
-export const REBOOT_BOSS_HP_MULT = 1.6
+export const REBOOT_BOSS_HP_MULT = 1.25
 export const REBOOT_VALUE_MULT = 2.5

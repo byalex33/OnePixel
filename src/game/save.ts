@@ -1,7 +1,8 @@
 import { ACHIEVEMENTS } from './achievements'
 import { BOSS_FIGHT_TIME, BOSS_INTERVAL, FINAL_EVERY, FINAL_FIGHT_TIME, SAVE_KEY, SAVE_VERSION } from './config'
+import { KERNEL_MAP } from './kernel'
 import { createInitialState } from './state'
-import type { SaveState, UpgradeId } from './types'
+import type { KernelId, SaveState, UpgradeId } from './types'
 import { UPGRADE_MAP } from './upgrades'
 
 export interface SaveFile {
@@ -29,7 +30,16 @@ type Raw = Record<string, unknown>
  */
 const MIGRATIONS: Record<number, (raw: Raw) => Raw> = {
   0: (raw) => ({ v: 1, savedAt: 0, maxSeenAt: 0, state: raw }),
+  // 0.3.0 adds the KERNEL. Anyone who had already rebooted gets back pay: RETRO_BITS per reboot.
+  1: (raw) => {
+    const st = isObj(raw.state) ? raw.state : {}
+    const reboots = typeof st.reboots === 'number' && Number.isFinite(st.reboots) ? Math.max(0, Math.floor(st.reboots)) : 0
+    return { ...raw, v: 2, state: { ...st, bits: num(st.bits, 0) + RETRO_BITS * reboots } }
+  },
 }
+
+/** CORE BITS granted per REBOOT made before the KERNEL existed. */
+export const RETRO_BITS = 10
 
 const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !Array.isArray(v)
 const num = (v: unknown, fallback: number, min = 0, max = Number.MAX_VALUE): number =>
@@ -53,6 +63,15 @@ export function sanitizeState(raw: unknown): SaveState {
   out.bossNuked = bool(raw.bossNuked, false)
   out.reboots = Math.floor(num(raw.reboots, 0, 0, 999))
   out.crashPending = bool(raw.crashPending, false)
+  out.bits = Math.floor(num(raw.bits, 0, 0, 1e9))
+  out.bootPending = bool(raw.bootPending, false)
+  out.runTime = num(raw.runTime, 0)
+  out.zeroTime = num(raw.zeroTime, 0)
+  if (isObj(raw.kernel)) {
+    for (const id of Object.keys(out.kernel) as KernelId[]) {
+      out.kernel[id] = Math.floor(num(raw.kernel[id], 0, 0, KERNEL_MAP[id].costs.length))
+    }
+  }
 
   if (isObj(raw.upgrades)) {
     for (const id of Object.keys(out.upgrades) as UpgradeId[]) {
@@ -83,6 +102,7 @@ export function sanitizeState(raw: unknown): SaveState {
       shake: bool(raw.settings.shake, true),
       flash: bool(raw.settings.flash, true),
       haptics: bool(raw.settings.haptics, true),
+      autoBuy: bool(raw.settings.autoBuy, true),
     }
   }
   return out

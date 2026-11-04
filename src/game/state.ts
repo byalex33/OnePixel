@@ -2,6 +2,7 @@ import type { LifetimeStats, SaveState, UpgradeLevels } from './types'
 import { UPGRADES } from './upgrades'
 import { rainInterval } from './formulas'
 import { BOSS_FIRST_DELAY } from './config'
+import { emptyKernel } from './kernel'
 
 export function emptyUpgrades(): UpgradeLevels {
   return Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as UpgradeLevels
@@ -15,6 +16,7 @@ export function emptyStats(): LifetimeStats {
     crits: 0,
     goldenKills: 0,
     blueKills: 0,
+    glitchKills: 0,
     droneKills: 0,
     bombKills: 0,
     laserKills: 0,
@@ -54,8 +56,13 @@ export function createInitialState(): SaveState {
     lastFinalAt: 0,
     seenUpgrades: [],
     reveal: { hud: false, panel: false },
-    settings: { sound: true, music: true, autoNuke: true, shake: true, flash: true, haptics: true },
+    settings: { sound: true, music: true, autoNuke: true, shake: true, flash: true, haptics: true, autoBuy: true },
     reboots: 0,
     crashPending: false,
+    bits: 0,
+    kernel: emptyKernel(),
+    bootPending: false,
+    runTime: 0,
+    zeroTime: 0,
   }
 }

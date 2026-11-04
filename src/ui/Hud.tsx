@@ -1,5 +1,5 @@
 import { GiNuclearBomb } from 'react-icons/gi'
-import { BOSS_NAME, COMBO_WINDOW, FINAL_NAME } from '../game/config'
+import { BOSS_NAME, FINAL_NAME } from '../game/config'
 import { fmt, fmtTime } from '../game/format'
 import { comboMult, xpToNext } from '../game/formulas'
 import { useRuntime } from './hooks'
@@ -54,7 +54,12 @@ export function ComboMeter() {
         COMBO +{Math.round((mult - 1) * 100)}%{count >= cap ? ' MAX' : ''}
       </div>
       <div className="mt-1.5 h-1 w-24 bg-line">
-        <div key={`d${count}`} className="h-full origin-left bg-hi" style={{ animation: `drain ${COMBO_WINDOW}s linear both` }} />
+        {/* STICKY COMBO 2: the clock never runs out, so the bar stays full. */}
+        <div
+          key={`d${count}`}
+          className="h-full origin-left bg-hi"
+          style={Number.isFinite(g.stats.comboWindow) ? { animation: `drain ${g.stats.comboWindow}s linear both` } : undefined}
+        />
       </div>
     </div>
   )

@@ -36,6 +36,7 @@ It opens on an empty screen with exactly one pixel and a hand-drawn arrow that s
 - **Buy upgrades.** Every new mechanic does nothing until you buy its first level, so you choose what to switch on and when.
 - **Automate.** Drones, bombs and lasers keep destroying pixels while you watch, or while you are away.
 - **Fight what surfaces.** Past level 20, something starts climbing out of the grid. Destroy it before it burrows back down.
+- **Reboot, and rewrite the rules.** Each REBOOT pays CORE BITS to spend in the KERNEL: permanent upgrades that make every run faster, bend the rules and add new mechanics, like glitch pixels that copy whatever special you hit last.
 
 ### Features
 
@@ -43,7 +44,8 @@ It opens on an empty screen with exactly one pixel and a hand-drawn arrow that s
 - Golden pixels worth x25, blue pixels worth x10 XP, and rainbow mode, where every pixel pays x10 or more and the screen lights up like an RGB keyboard
 - A dot-matrix landscape that grows in behind the arena as you level
 - Bosses, a final boss, and a REBOOT that starts you over with everything worth more
-- 28 achievements, each worth +2% pixel value
+- The KERNEL: 15 permanent upgrades across three branches, bought with CORE BITS from each reboot
+- 32 achievements, each worth +2% pixel value
 - Synthesised chiptune sound effects and music
 - Plays well on phones as well as desktops
 - Autosaves in your browser, with offline progress and save codes you can export

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { REBOOT_BOSS_HP_MULT, REBOOT_PRICE_MULT, REBOOT_VALUE_MULT } from '../game/config'
+import { bitsForRun } from '../game/kernel'
 import { useRuntime } from './hooks'
 
 /** The fake "% complete" counter jumps unevenly, like the real thing. */
@@ -49,6 +50,13 @@ function Crash() {
   const pct = PROGRESS[Math.min(step, PROGRESS.length - 1)]
   const done = step >= PROGRESS.length
   const next = s.reboots + 1
+  const pay = bitsForRun(s)
+  // "Collecting some pixel info" really is: the CORE BITS tally fills in as the counter climbs.
+  const tally: [string, number, number][] = [
+    [`PIXEL ZERO x${s.stats.finalKills}`, pay.zero, 3],
+    [`BOSSES x${s.stats.bossKills}`, pay.bosses, 5],
+    ['SPEED BONUS', pay.speed, 7],
+  ]
 
   return createPortal(
     <div
@@ -69,6 +77,22 @@ function Crash() {
           Your screen ran into a problem and needs to reboot. We&apos;re just collecting some pixel info, and then you can decide what happens next.
         </p>
         <p className="mt-6 font-pixel text-[14px] md:text-[18px]">{pct}% complete</p>
+        <div className="mt-4 font-pixel text-[9px] leading-relaxed md:text-[11px]" aria-live="polite">
+          {tally
+            .filter(([, , at]) => step >= at)
+            .map(([k, v]) => (
+              <div key={k} className="anim-pop flex max-w-[360px] justify-between gap-4">
+                <span className="text-white/80">{k}</span>
+                <span>+{v}</span>
+              </div>
+            ))}
+          {step >= 9 && (
+            <div className="anim-pop mt-1 flex max-w-[360px] justify-between gap-4 border-t-2 border-white/40 pt-1 text-gold">
+              <span>CORE BITS{pay.mult > 1 ? ` x${pay.mult}` : ''}</span>
+              <span>+{pay.total}</span>
+            </div>
+          )}
+        </div>
 
         <div className="mt-8 flex items-start gap-4">
           <div
@@ -92,14 +116,14 @@ function Crash() {
             <button type="button" autoFocus className={choice} onClick={() => rt.reboot()}>
               <div className="font-pixel text-[13px]">&gt; REBOOT #{next}</div>
               <div className="mt-2 text-[18px] leading-tight">
-                Start over at level 1, keeping your feats. Prices x{REBOOT_PRICE_MULT ** next} and bosses x{(REBOOT_BOSS_HP_MULT ** next).toFixed(1)} tougher, but every pixel is worth x
-                {(REBOOT_VALUE_MULT ** next).toFixed(1)} more. Forever.
+                Collect {pay.total} CORE BITS and spend them in the KERNEL, then start over keeping your feats. Prices x{REBOOT_PRICE_MULT ** next} and bosses x
+                {+(REBOOT_BOSS_HP_MULT ** next).toFixed(2)} tougher, but every pixel is worth x{(REBOOT_VALUE_MULT ** next).toFixed(1)} more. Forever.
               </div>
             </button>
             <button type="button" className={choice} onClick={() => rt.continueAfterCrash()}>
               <div className="font-pixel text-[13px]">&gt; CONTINUE</div>
               <div className="mt-2 text-[18px] leading-tight">
-                Keep playing. The bosses keep coming, and PIXEL ZERO will return stronger. You can still reboot later from SYSTEM.
+                Keep playing. The bosses keep coming and PIXEL ZERO returns stronger, and every kill adds to your CORE BITS. Reboot later from SYSTEM.
               </div>
             </button>
           </div>

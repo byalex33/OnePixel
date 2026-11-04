@@ -5,8 +5,9 @@ import { hasFeature } from './levels'
 import { offlineGains, type OfflineGains } from './offline'
 import { Rng } from './rng'
 import { createInitialState } from './state'
-import type { BossDamageSource, Cause, GameEvent, PixelKind, SaveState, UpgradeId } from './types'
-import { costOf, isMaxed, isUnlocked } from './upgrades'
+import { install } from './kernel'
+import type { BossDamageSource, Cause, GameEvent, GlitchCopy, KernelId, PixelKind, SaveState, UpgradeId } from './types'
+import { costOf, isMaxed, isUnlocked, UPGRADES } from './upgrades'
 
 export interface Pixel {
   id: number
@@ -115,8 +116,8 @@ export interface Rect {
 }
 
 const MAX_EVENTS = 800
-/** Golden and rainbow pixels are left for the player: drones, chains and the boss skip them. */
-const autoCanTake = (p: Pixel) => p.kind !== 'golden' && p.kind !== 'rainbow'
+/** Golden, rainbow and glitch pixels are left for the player: drones, chains and the boss skip them. */
+const autoCanTake = (p: Pixel) => p.kind !== 'golden' && p.kind !== 'rainbow' && p.kind !== 'glitch'
 /** Drone target id meaning "the boss" rather than a pixel. */
 const BOSS_TARGET = -1
 const EARN_BINS = 10
@@ -168,6 +169,11 @@ export class Game {
   private forceGolden = false
   /** Same for blue pixels, so the first purchase shows off straight away. */
   private forceBlue = false
+  /** The last special the player hit, which a glitch pixel copies. */
+  lastSpecial: GlitchCopy | null = null
+  /** Where the player last tapped, which MAGNET pulls pixels towards. */
+  lastTap: { x: number; y: number } | null = null
+  private autoBuyTimer = 0
   private achTimer = 0
   private earnBins: number[] = new Array(EARN_BINS).fill(0)
   private earnBinT = 0
@@ -210,6 +216,7 @@ export class Game {
     }
     this.blasts.forEach(scaleAll)
     if (this.boss) scaleAll(this.boss)
+    if (this.lastTap) scaleAll(this.lastTap)
     for (const l of this.lasers) {
       l.x1 *= sx
       l.x2 *= sx
@@ -254,18 +261,18 @@ export class Game {
     return this.stats.nukeEnabled && this.state.nukeCharge >= this.stats.nukeKills && !this.nuke
   }
 
-  /** Auto-launch is the reward for maxing NUKE SILO. */
+  /** Auto-launch is the reward for maxing NUKE SILO, or for the KERNEL's DEAD MAN'S SWITCH. */
   get autoNukeUnlocked(): boolean {
-    return this.stats.nukeEnabled && isMaxed(this.state, 'nukeCharge')
+    return this.stats.nukeEnabled && (this.stats.autoLaunch || isMaxed(this.state, 'nukeCharge'))
   }
 
   canBuy(id: UpgradeId): boolean {
     return isUnlocked(this.state, id) && !isMaxed(this.state, id) && this.state.pixels >= costOf(id, this.state.upgrades[id], this.state.reboots)
   }
 
-  buy(id: UpgradeId): boolean {
+  buy(id: UpgradeId, auto = false): boolean {
     if (!this.canBuy(id)) {
-      this.emit({ type: 'denied' })
+      if (!auto) this.emit({ type: 'denied' })
       return false
     }
     this.state.pixels -= costOf(id, this.state.upgrades[id], this.state.reboots)
@@ -273,9 +280,39 @@ export class Game {
     this.markSeen(id)
     this.refreshStats()
     if (this.state.upgrades[id] === 1) this.onFirstPurchase(id)
-    this.emit({ type: 'buy', id, level: this.state.upgrades[id] })
+    this.emit({ type: 'buy', id, level: this.state.upgrades[id], auto })
     this.revision++
     return true
+  }
+
+  /** Spend CORE BITS on a KERNEL node. Effects that apply mid-run (kits, rules) apply at once. */
+  installKernel(id: KernelId): boolean {
+    if (!install(this.state, id)) return false
+    this.refreshStats()
+    this.emit({ type: 'kernel', id, level: this.state.kernel[id] })
+    this.revision++
+    return true
+  }
+
+  /** SCRIPT: buy the cheapest upgrade the player can afford, a few at a time. */
+  private updateAutoBuy(dt: number): void {
+    if (!this.stats.script || !this.state.settings.autoBuy || this.lockdown) return
+    this.autoBuyTimer -= dt
+    if (this.autoBuyTimer > 0) return
+    this.autoBuyTimer = C.AUTO_BUY_INTERVAL
+    for (let i = 0; i < C.AUTO_BUY_BATCH; i++) {
+      let pick: UpgradeId | null = null
+      let best = Infinity
+      for (const u of UPGRADES) {
+        if (!isUnlocked(this.state, u.id) || isMaxed(this.state, u.id)) continue
+        const c = costOf(u.id, this.state.upgrades[u.id], this.state.reboots)
+        if (c < best) {
+          best = c
+          pick = u.id
+        }
+      }
+      if (!pick || best > this.state.pixels || !this.buy(pick, true)) return
+    }
   }
 
   /** Buy as many levels as the player can afford. Returns how many were bought. */
@@ -306,6 +343,7 @@ export class Game {
     if (this.nuke) return
     const st = this.state.stats
     st.clicks++
+    if (this.stats.magnet) this.lastTap = { x, y }
 
     for (const b of this.bombs) {
       if (Math.hypot(b.x - x, b.y - y) <= this.hitRadius + 3) b.fuse = 0
@@ -324,6 +362,11 @@ export class Game {
     const bossHit = boss !== null && Math.abs(boss.x - x) <= boss.r + this.hitRadius && Math.abs(boss.y - y) <= boss.r + this.hitRadius
     if (hits.length === 0 && !bossHit) {
       this.emit({ type: 'miss', x, y })
+      // With STICKY COMBO 2 the clock never runs out, so a miss is the only thing that breaks a combo.
+      if (this.stats.comboWindow === Infinity && this.combo.count > 0) {
+        this.combo.count = 0
+        this.revision++
+      }
       return
     }
     if (bossHit) {
@@ -340,9 +383,9 @@ export class Game {
     }
   }
 
-  /** The next boss to surface is PIXEL ZERO: FINAL_EVERY regular kills after the last one. */
+  /** The next boss to surface is PIXEL ZERO: FINAL_EVERY (or KERNEL PANIC's fewer) regular kills after the last one. */
   get finalDue(): boolean {
-    return this.state.stats.bossKills - this.state.lastFinalAt >= C.FINAL_EVERY
+    return this.state.stats.bossKills - this.state.lastFinalAt >= this.stats.finalEvery
   }
 
   /** Kills per second that charge the nuke, averaged over the last few seconds. */
@@ -372,7 +415,7 @@ export class Game {
       final: this.finalDue,
       seconds: this.state.bossTimer,
       health: this.state.bossHealth,
-      killsToFinal: Math.max(0, C.FINAL_EVERY - (this.state.stats.bossKills - this.state.lastFinalAt)),
+      killsToFinal: Math.max(0, this.stats.finalEvery - (this.state.stats.bossKills - this.state.lastFinalAt)),
     }
   }
 
@@ -459,7 +502,9 @@ export class Game {
   tick(dt: number): void {
     this.time += dt
     this.state.stats.playTime += dt
+    this.state.runTime += dt
     if (this.statsDirty) this.refreshStats()
+    this.updateAutoBuy(dt)
 
     this.updateCombo(dt)
     if (this.state.settings.autoNuke && this.autoNukeUnlocked && this.nukeReady && !this.holdNukeForFinal) this.launchNuke()
@@ -515,6 +560,7 @@ export class Game {
    */
   collectOffline(seconds: number): OfflineGains | null {
     if (this.offlineFrozen) return null
+    this.state.runTime += seconds
     const gains = offlineGains(this.state, seconds)
     if (gains.kills <= 0) return null
     this.grant(gains.pixels, gains.xp)
@@ -522,7 +568,7 @@ export class Game {
   }
 
   private get offlineFrozen(): boolean {
-    if (this.state.crashPending || this.lockdown) return true
+    if (this.state.crashPending || this.state.bootPending || this.lockdown) return true
     // Just loaded from a save made mid-fight: PIXEL ZERO comes straight back on the first tick.
     return this.boss === null && this.state.bossTimer <= 0 && this.finalDue && hasFeature(this.state.level, 'boss')
   }
@@ -545,15 +591,22 @@ export class Game {
 
     let amount = s.value * mult
     let xp = s.xpPerKill
-    if (p.kind === 'golden') {
+    // A glitch pixel plays back the last special hit; with nothing hit yet it pays out like a golden one.
+    const copy: GlitchCopy | undefined = p.kind === 'glitch' ? (this.lastSpecial ?? 'golden') : undefined
+    if (copy) st.glitchKills++
+    if (p.kind === 'golden' || copy === 'golden') {
       amount *= C.GOLDEN_MULT
       xp *= C.GOLDEN_XP_MULT
-      st.goldenKills++
-    } else if (p.kind === 'blue') {
+      if (!copy) st.goldenKills++
+    } else if (p.kind === 'blue' || copy === 'blue') {
       xp *= C.BLUE_XP_MULT
-      st.blueKills++
+      if (!copy) st.blueKills++
     }
-    if (p.kind === 'rainbow') this.startRainbow()
+    if (p.kind === 'rainbow' || copy === 'rainbow') this.startRainbow()
+    if (copy === 'bomb') {
+      this.blasts.push({ x: p.x, y: p.y, r: s.bombRadius, delay: C.GLITCH_BOMB_DELAY, cause: 'bomb', group: this.newGroup('bomb'), depth: 0 })
+    }
+    if (p.kind === 'golden' || p.kind === 'blue' || p.kind === 'rainbow') this.lastSpecial = p.kind
     if (this.rainbow > 0) amount *= s.rainbowMult
     const crit = s.critChance > 0 && this.rng.chance(s.critChance)
     if (crit) {
@@ -595,7 +648,7 @@ export class Game {
       this.chainFrom(p, cause === 'chain' ? group : null, depth + 1)
     }
 
-    this.emit({ type: 'pop', x: p.x, y: p.y, kind: p.kind, amount, xp, crit, cause, combo: this.combo.count })
+    this.emit({ type: 'pop', x: p.x, y: p.y, kind: p.kind, amount, xp, crit, cause, combo: this.combo.count, copy })
   }
 
   private earn(amount: number, track: boolean): void {
@@ -709,7 +762,7 @@ export class Game {
   private bumpCombo(): void {
     if (this.stats.comboCap <= 0) return
     this.combo.count++
-    this.combo.timer = C.COMBO_WINDOW
+    this.combo.timer = this.stats.comboWindow
     if (this.combo.count > this.state.stats.maxCombo) this.state.stats.maxCombo = this.combo.count
   }
 
@@ -729,7 +782,7 @@ export class Game {
       kind,
       slot,
       age: 0,
-      life: vy !== 0 ? Infinity : kind === 'golden' ? C.GOLDEN_LIFETIME : kind === 'rainbow' ? C.RAINBOW_LIFETIME : Infinity,
+      life: vy !== 0 ? Infinity : kind === 'golden' || kind === 'glitch' ? C.GOLDEN_LIFETIME : kind === 'rainbow' ? C.RAINBOW_LIFETIME : Infinity,
       dead: false,
     }
     this.pixels.push(p)
@@ -815,7 +868,7 @@ export class Game {
     this.bombs = []
     this.lasers = []
     this.blasts = []
-    this.state.nukeCharge = 0
+    this.state.nukeCharge = Math.floor(this.stats.nukeKills * this.stats.nukeKeep)
     this.state.stats.nukes++
     this.frenzy = C.FRENZY_TIME
     for (let i = 0; i < this.respawns.length; i++) {
@@ -828,6 +881,7 @@ export class Game {
   }
 
   private updatePixels(dt: number): void {
+    const tap = this.stats.magnet && !this.lockdown ? this.lastTap : null
     for (const p of this.pixels) {
       if (p.dead) continue
       p.age += dt
@@ -836,6 +890,7 @@ export class Game {
         if (p.y > this.h + 6) p.dead = true
         continue
       }
+      if (tap) this.pull(p, tap, dt)
       if (p.life !== Infinity) {
         p.life -= dt
         if (p.life <= 0) {
@@ -844,6 +899,21 @@ export class Game {
           if (p.slot) this.queueRespawn()
         }
       }
+    }
+  }
+
+  /** MAGNET: drift towards the last tap, stopping on a ring around it so pixels don't pile up on one spot. */
+  private pull(p: Pixel, to: { x: number; y: number }, dt: number): void {
+    const dx = to.x - p.x
+    const dy = to.y - p.y
+    const d = Math.hypot(dx, dy)
+    if (d <= C.MAGNET_RING || d > C.MAGNET_RANGE) return
+    const step = Math.min(C.MAGNET_SPEED * dt, d - C.MAGNET_RING)
+    const nx = p.x + (dx / d) * step
+    const ny = p.y + (dy / d) * step
+    if (!this.underHud(nx, ny)) {
+      p.x = nx
+      p.y = ny
     }
   }
 
@@ -859,7 +929,9 @@ export class Game {
     this.respawns = remaining
     for (const r of due) {
       let kind: PixelKind = 'normal'
-      if (this.stats.goldenChance > 0 && (this.forceGolden || this.rng.chance(this.stats.goldenChance))) {
+      if (this.stats.glitchChance > 0 && this.rng.chance(this.stats.glitchChance)) {
+        kind = 'glitch'
+      } else if (this.stats.goldenChance > 0 && (this.forceGolden || this.rng.chance(this.stats.goldenChance))) {
         kind = 'golden'
         this.forceGolden = false
       } else if (this.stats.blueChance > 0 && (this.forceBlue || this.rng.chance(this.stats.blueChance))) {
@@ -868,6 +940,11 @@ export class Game {
       }
       this.spawnPixel(r.x, r.y, kind, true)
     }
+  }
+
+  /** GOLD MAGNET lets drones take golden pixels too. */
+  private droneCanTake(p: Pixel): boolean {
+    return autoCanTake(p) || (this.stats.goldMagnet && p.kind === 'golden')
   }
 
   private updateDrones(dt: number): void {
@@ -896,13 +973,13 @@ export class Game {
       if (d.cooldown > 0) d.cooldown -= dt
       let onBoss = boss !== null && d.targetId === BOSS_TARGET
       let target = d.targetId !== null && !onBoss ? byId.get(d.targetId) : undefined
-      if (!onBoss && (!target || !autoCanTake(target))) {
+      if (!onBoss && (!target || !this.droneCanTake(target))) {
         if (d.targetId !== null) claimed.delete(d.targetId)
         target = undefined
         d.targetId = null
         let best = Infinity
         for (const p of byId.values()) {
-          if (!autoCanTake(p) || claimed.has(p.id) || p.age < 0.15) continue
+          if (!this.droneCanTake(p) || claimed.has(p.id) || p.age < 0.15) continue
           const dist = Math.hypot(p.x - d.x, p.y - d.y)
           if (dist < best) {
             best = dist
@@ -1089,6 +1166,7 @@ export class Game {
         b.y = b.target.y
       }
       this.emit({ type: 'blast', x: b.x, y: b.y, r: b.r, cause: b.cause, mini: b.mini })
+      if (b.cause === 'bomb' && !b.mini) this.lastSpecial = 'bomb'
       const reach = b.r + C.PIXEL_SIZE / 2
       for (const p of this.pixels) {
         if (p.dead || (b.cause === 'chain' && !autoCanTake(p))) continue
@@ -1189,7 +1267,9 @@ export class Game {
   }
 
   private startRainbow(): void {
-    this.rainbow = Math.max(this.rainbow, this.stats.rainbowDuration)
+    const d = this.stats.rainbowDuration
+    // DOUBLE RAINBOW stacks the time, up to a few rainbows' worth.
+    this.rainbow = this.stats.doubleRainbow ? Math.min(this.rainbow + d, d * C.RAINBOW_STACK_MAX) : Math.max(this.rainbow, d)
     this.emit({ type: 'rainbow-start', duration: this.rainbow })
     this.revision++
   }
@@ -1202,8 +1282,9 @@ export class Game {
         this.revision++
       }
     }
-    // One rainbow pixel at a time, and never while the mode is already running.
-    if (!Number.isFinite(this.stats.rainbowInterval) || this.nuke || this.rainbow > 0 || this.lockdown) return
+    // One rainbow pixel at a time, and never while the mode is already running (unless DOUBLE RAINBOW).
+    if (!Number.isFinite(this.stats.rainbowInterval) || this.nuke || this.lockdown) return
+    if (this.rainbow > 0 && !this.stats.doubleRainbow) return
     if (this.pixels.some((p) => p.kind === 'rainbow' && !p.dead)) return
     this.rainbowTimer -= dt
     if (this.rainbowTimer <= 0) {
@@ -1350,6 +1431,7 @@ export class Game {
     this.earn(amount, true)
     this.addXp(xpToNext(this.state.level) * C.FINAL_REWARD_XP_FRAC)
     this.state.stats.finalKills++
+    if (this.state.zeroTime <= 0) this.state.zeroTime = Math.max(1, this.state.runTime)
     this.state.lastFinalAt = this.state.stats.bossKills
     this.state.bossTimer = C.BOSS_INTERVAL
     this.state.bossHealth = 1

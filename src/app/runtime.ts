@@ -5,9 +5,9 @@ import { Game, type Rect } from '../game/game'
 import { offlineSeconds, type OfflineGains } from '../game/offline'
 import { exportSave, importSave, loadFrom, makeSaveFile, writeTo, type KeyValueStore } from '../game/save'
 import { SAVE_KEY } from '../game/config'
-import type { GameEvent, Settings, UpgradeId } from '../game/types'
+import type { GameEvent, KernelId, Settings, UpgradeId } from '../game/types'
 import { unlocksBetween, type LevelDef } from '../game/levels'
-import { rebootState } from '../game/prestige'
+import { beginReboot, rebootState } from '../game/prestige'
 import { Renderer } from '../render/renderer'
 
 export type Notice =
@@ -141,8 +141,8 @@ export class Runtime {
     const dt = Math.min(0.25, Math.max(0, (now - this.last) / 1000))
     this.last = now
 
-    // The world freezes behind the crash screen until the player chooses.
-    const crashed = this.game.state.crashPending
+    // The world freezes behind the crash screen until the player chooses, and behind the KERNEL boot screen until BOOT.
+    const crashed = this.game.state.crashPending || this.game.state.bootPending
     if (crashed) this.game.advanceCrash(dt)
     this.music.setSilenced(crashed)
     this.acc = crashed ? 0 : this.acc + dt
@@ -199,6 +199,7 @@ export class Runtime {
           urgent = true
           break
         case 'buy':
+        case 'kernel':
         case 'nuke-warn':
         case 'rain-start':
         case 'rain-end':
@@ -232,7 +233,7 @@ export class Runtime {
           if (e.cause === 'bomb') this.buzz(25)
           break
         case 'pop':
-          if (e.crit || e.kind === 'golden' || e.kind === 'rainbow') this.buzz(12)
+          if (e.crit || e.kind === 'golden' || e.kind === 'rainbow' || e.kind === 'glitch') this.buzz(12)
           break
       }
     }
@@ -345,10 +346,26 @@ export class Runtime {
     this.save()
   }
 
-  /** REBOOT: start again from level 1, harder but richer. Feats and settings carry over. */
-  reboot(): void {
+  /** REBOOT: pay this run's CORE BITS and open the KERNEL boot screen. The new run starts on BOOT. */
+  reboot(): number {
+    const paid = beginReboot(this.game.state)
+    this.save()
+    this.bump()
+    return paid
+  }
+
+  /** BOOT from the KERNEL screen: start again from level 1 (or FAST BOOT's level), harder but richer. */
+  boot(): void {
+    if (!this.game.state.bootPending) return
     this.replaceGame(new Game(rebootState(this.game.state)))
     this.save()
+  }
+
+  installKernel(id: KernelId): boolean {
+    const ok = this.game.installKernel(id)
+    if (ok) this.save()
+    this.bump()
+    return ok
   }
 
   /** CONTINUE on the crash screen: keep playing in infinite mode. */

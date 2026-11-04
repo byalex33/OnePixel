@@ -1,6 +1,8 @@
 import { BOSS_FIGHT_TIME, DT, FINAL_FIGHT_TIME } from './config'
 import { Game } from './game'
-import type { GameEvent, SaveState, UpgradeId } from './types'
+import { canInstall } from './kernel'
+import { beginReboot, rebootState } from './prestige'
+import type { GameEvent, KernelId, SaveState, UpgradeId } from './types'
 import { costOf, isMaxed, isUnlocked, UPGRADES } from './upgrades'
 
 export interface BotOptions {
@@ -18,6 +20,45 @@ export interface BotOptions {
   start?: SaveState
   /** Sees every simulation event, with the time it happened. */
   onEvent?: (e: GameEvent, t: number) => void
+  /** REBOOT this many times when PIXEL ZERO dies (spending bits by KERNEL_PRIORITY), then CONTINUE. Default 0. */
+  reboots?: number
+  /** The order the bot installs KERNEL nodes in. Defaults to KERNEL_PRIORITY. */
+  kernelPriority?: KernelId[]
+}
+
+/** A sensible player's KERNEL shopping list: faster runs and boss damage first, then the rule changes. */
+export const KERNEL_PRIORITY: KernelId[] = [
+  'xpBoost',
+  'rootAccess',
+  'fastBoot',
+  'script',
+  'starterKit',
+  'stickyCombo',
+  'cachedPerks',
+  'magnet',
+  'goldMagnet',
+  'overflow',
+  'autoLaunch',
+  'bitMiner',
+  'glitch',
+  'doubleRainbow',
+  'kernelPanic',
+]
+
+export interface RunLog {
+  /** Seconds into the simulation the run started. */
+  start: number
+  /** Seconds from the run's start to its first PIXEL ZERO kill, or null if it never fell. */
+  zero: number | null
+  /** Seconds from the run's start to level 20 (bosses), or null. */
+  l20: number | null
+  /** Boss fights lost (regular and PIXEL ZERO) before the first PIXEL ZERO kill. */
+  escapes: number
+  /** CORE BITS paid when this run rebooted (0 if it never did). */
+  bits: number
+  /** Bits left after shopping, and the nodes bought, at that reboot. */
+  bank: number
+  bought: KernelId[]
 }
 
 export interface BotResult {
@@ -30,6 +71,8 @@ export interface BotResult {
   finalLog: { t: number; outcome: 'defeat' | 'escape'; secs: number }[]
   /** Lifetime pixels earned, sampled every INCOME_SAMPLE seconds (index i is at i * INCOME_SAMPLE). */
   earned: number[]
+  /** One entry per run: the first, then one more for each REBOOT. */
+  runs: RunLog[]
   game: Game
 }
 
@@ -47,10 +90,27 @@ export function incomeAt(r: BotResult, t: number, window = 60): number {
   return i > j ? (r.earned[i] - r.earned[j]) / ((i - j) * INCOME_SAMPLE) : 0
 }
 
-export function runBot(opts: BotOptions): BotResult {
-  const g = new Game(opts.start && structuredClone(opts.start), opts.seed)
+function newGame(state: SaveState | undefined, seed: number): Game {
+  const g = new Game(state, seed)
   g.resize(240, 160)
   g.hitRadius = 6
+  return g
+}
+
+/** Spend every bit the bot can, in priority order. Returns what it bought. */
+function shopKernel(g: Game, priority: KernelId[]): KernelId[] {
+  const bought: KernelId[] = []
+  for (;;) {
+    const pick = priority.find((id) => canInstall(g.state, id))
+    if (!pick || !g.installKernel(pick)) return bought
+    bought.push(pick)
+  }
+}
+
+export function runBot(opts: BotOptions): BotResult {
+  let g = newGame(opts.start && structuredClone(opts.start), opts.seed)
+  const runs: RunLog[] = [{ start: 0, zero: null, l20: null, escapes: 0, bits: 0, bank: 0, bought: [] }]
+  let rebootsLeft = opts.reboots ?? 0
   const levelTimes = new Map<number, number>([[1, 0]])
   const purchases: BotResult['purchases'] = []
   const bossLog: BotResult['bossLog'] = []
@@ -69,7 +129,7 @@ export function runBot(opts: BotOptions): BotResult {
     clickCd -= DT
     if (clickCd <= 0) {
       const candidates = g.pixels.filter((p) => !p.dead && p.age >= opts.reaction && p.y > 0)
-      const loot = candidates.find((p) => p.kind === 'golden' || p.kind === 'rainbow')
+      const loot = candidates.find((p) => p.kind === 'golden' || p.kind === 'rainbow' || p.kind === 'glitch')
       const fightTime = g.boss?.final ? FINAL_FIGHT_TIME : BOSS_FIGHT_TIME
       const boss = g.boss && g.boss.phase === 'fight' && g.boss.timeLeft < fightTime - opts.reaction ? g.boss : undefined
       const target = boss ?? loot ?? candidates.find((p) => p.kind === 'blue') ?? candidates.sort((a, b) => b.age - a.age)[0]
@@ -96,15 +156,34 @@ export function runBot(opts: BotOptions): BotResult {
     g.tick(DT)
     for (const e of g.drainEvents()) {
       opts.onEvent?.(e, t)
+      const cur = runs[runs.length - 1]
+      if (e.type === 'levelup' && e.level === 20 && cur.l20 === null) cur.l20 = t - cur.start
+      if (e.type === 'boss-escape' && cur.zero === null) cur.escapes++
       if (e.type === 'levelup') levelTimes.set(e.level, t)
       else if (e.type === 'boss-rise') bossRose = t
       else if (e.type === 'boss-defeat') bossLog.push({ t: bossRose, tier: e.tier, outcome: 'defeat', secs: t - bossRose })
       else if (e.type === 'boss-escape' && !g.boss?.final) bossLog.push({ t: bossRose, tier: g.state.stats.bossKills + 1, outcome: 'escape', secs: t - bossRose })
       else if (e.type === 'boss-escape') finalLog.push({ t: bossRose, outcome: 'escape', secs: t - bossRose })
-      else if (e.type === 'final-defeat') finalLog.push({ t: bossRose, outcome: 'defeat', secs: t - bossRose })
+      else if (e.type === 'final-defeat') {
+        finalLog.push({ t: bossRose, outcome: 'defeat', secs: t - bossRose })
+        const run = runs[runs.length - 1]
+        if (run.zero === null) run.zero = t - run.start
+      }
     }
-    // The bot always picks CONTINUE (infinite mode) so long runs keep climbing.
+    if (g.state.crashPending && rebootsLeft > 0) {
+      // REBOOT: collect the bits, shop the KERNEL, BOOT a fresh run.
+      rebootsLeft--
+      const run = runs[runs.length - 1]
+      run.bits = beginReboot(g.state)
+      run.bought = shopKernel(g, opts.kernelPriority ?? KERNEL_PRIORITY)
+      run.bank = g.state.bits
+      g = newGame(rebootState(g.state), opts.seed + runs.length)
+      runs.push({ start: t, zero: null, l20: null, escapes: 0, bits: 0, bank: 0, bought: [] })
+      bossRose = 0
+      nukeWait = 0
+    }
+    // Out of reboots, the bot picks CONTINUE (infinite mode) so long runs keep climbing.
     if (g.state.crashPending) g.continueAfterCrash()
   }
-  return { levelTimes, purchases, bossLog, finalLog, earned, game: g }
+  return { levelTimes, purchases, bossLog, finalLog, earned, runs, game: g }
 }

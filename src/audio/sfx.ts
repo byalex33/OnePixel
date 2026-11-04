@@ -24,6 +24,8 @@ export type Cue =
   | 'denied'
   | 'rain'
   | 'rainbow'
+  | 'glitch'
+  | 'kernel'
   | 'boss-rise'
   | 'boss-hit'
   | 'boss-eat'
@@ -149,6 +151,15 @@ export class Sfx {
         break
       case 'rainbow':
         ;[523, 659, 784, 988, 1175, 1319, 1568, 2093].forEach((f, i) => this.tone('square', f, f * 1.02, 0.08, 0.28, i * 0.04))
+        break
+      case 'glitch':
+        // A corrupted arpeggio: notes out of order, bent, with a crackle underneath.
+        ;[1568, 784, 2093, 1047, 1760].forEach((f, i) => this.tone('square', f, f * (i % 2 ? 0.7 : 1.4), 0.04, 0.28, i * 0.035))
+        this.noise(0.16, 0.25, 3200)
+        break
+      case 'kernel':
+        ;[392, 587, 784, 1175].forEach((f, i) => this.tone('square', f, f, 0.06, 0.32, i * 0.06))
+        this.tone('triangle', 1568, 1568, 0.2, 0.25, 0.24)
         break
       case 'boss-rise':
         this.noise(1.6, 0.8, 400)
@@ -334,6 +345,7 @@ export class Sfx {
 export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
   switch (e.type) {
     case 'pop':
+      if (e.kind === 'glitch') return { cue: 'glitch' }
       if (e.kind === 'golden') return { cue: 'gold' }
       if (e.kind === 'blue') return { cue: 'blue' }
       if (e.crit) return { cue: 'crit' }
@@ -357,7 +369,10 @@ export function cueFor(e: GameEvent): { cue: Cue; opts?: CueOpts } | null {
     case 'achievement':
       return { cue: 'achievement' }
     case 'buy':
-      return { cue: 'buy' }
+      // SCRIPT's auto-buys stay quiet, or a busy auto-buyer would drown everything out.
+      return e.auto ? null : { cue: 'buy' }
+    case 'kernel':
+      return { cue: 'kernel' }
     case 'denied':
       return { cue: 'denied' }
     case 'rain-start':

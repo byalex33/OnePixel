@@ -26,6 +26,7 @@ A retro dot-matrix incremental game about destroying a single pixel, and then a 
 - [Screenshots](#screenshots)
 - [Progression](#progression)
 - [The shop](#the-shop)
+- [Bosses, REBOOT and the KERNEL](#bosses-reboot-and-the-kernel)
 - [Pacing](#pacing)
 - [Saves and offline progress](#saves-and-offline-progress)
 - [Running locally](#running-locally)
@@ -87,10 +88,13 @@ Controls: click or tap pixels. Tap a bomb to detonate it early. Tap an upgrade t
 - Rainbow mode: pop a rainbow pixel and every pixel pays x10 (up to x30 with upgrades) for a few seconds, while the arena and balance box light up like an RGB keyboard
 - Auto-destroyer drones that fly to pixels and click them
 - Bombs that drop into crowds, orbital lasers, pixel rain storms and a nuke that wipes the board
+- Bosses that surface from beneath the grid, and a final boss, PIXEL ZERO, that crashes the screen when it dies
+- REBOOT to start over richer, and spend CORE BITS in the KERNEL: a circuit board of permanent upgrades that make every run faster and stranger
+- Glitch pixels (from the KERNEL) that copy the last special you hit: a golden payout, blue XP, a rainbow or a bomb blast
 
 **World**
 - A dot-matrix landscape that grows as you level: ground, mountains, trees, clouds and a moon scan in on the old-monitor arena
-- 23 achievements, each worth +2% pixel value
+- 32 feats, each worth +2% pixel value
 - Upcoming unlocks are previewed; later ones stay hidden behind `???`
 
 **Platform**
@@ -140,7 +144,7 @@ Levels unlock **mechanics**, not stat bumps. Reaching a level stocks the shop; y
 | 16 | Golden storms | Pixel rain carries golden pixels. |
 | 17 | Rainbow mode | Rare rainbow pixels; pop one and every pixel pays x10 or more for a few seconds. |
 | 18 | Overclock | Every machine runs 25% faster. |
-| 20 | ??? | To be continued. |
+| 20 | Signal | Bosses start surfacing from beneath the grid. ARMOR PIERCING joins the shop. |
 
 </details>
 
@@ -164,8 +168,31 @@ Levels unlock **mechanics**, not stat bumps. Reaching a level stocks the shop; y
 | Nuke Silo / Warhead Yield | 12 | Build and charge the nuke; nuked pixels pay more |
 | Drone Swarm, Cluster Bombs, Twin Lasers, Golden Storms, Overclock | 13 to 18 | One-off perks |
 | Rainbow Mode | 17 | Rainbow pixels arrive more often and rainbow mode lasts longer (2s up to 4s) |
+| Armor Piercing | 20 | Every hit on a boss does more damage |
 
 Costs grow exponentially per level, so every upgrade stays a choice rather than a checklist.
+
+## Bosses, REBOOT and the KERNEL
+
+<details>
+<summary><b>The late game (spoilers)</b></summary>
+
+From level 20 a boss surfaces every few minutes. You have a minute to destroy it before it burrows back down, and if it escapes it comes back with its wounds. Every fifth kill, PIXEL ZERO, the very first pixel, surfaces instead. Destroying it crashes the screen, and you choose:
+
+- **CONTINUE:** keep playing. The bosses keep coming and PIXEL ZERO returns stronger.
+- **REBOOT:** start over. Prices are x2 and bosses x1.25 tougher, but every pixel is worth x2.5, for good. You also collect **CORE BITS**: 8 for each PIXEL ZERO and 2 for each boss you killed this run, plus a speed bonus of 1 for every 15 minutes your first PIXEL ZERO kill beat three hours by (up to 10).
+
+Bits are spent in the **KERNEL**, shown on the boot screen between runs and in its own tab. It has three branches of five nodes, and each node needs the one before it:
+
+| Branch | Nodes |
+| --- | --- |
+| BOOT (faster runs) | XP BOOST (+25% XP a level), FAST BOOT (start at level 3, 6 or 9), STARTER KIT (start with early upgrades bought), CACHED PERKS (one-off perks are free when they unlock), BIT MINER (+25% bits a level) |
+| OVERRIDE (rule changes) | SCRIPT (auto-buy the cheapest upgrade), STICKY COMBO (twice as long, then no time limit at all, though a miss still breaks it), GOLD MAGNET (drones catch golden pixels), DEAD MAN'S SWITCH (AUTO nuke from the first silo level), DOUBLE RAINBOW (rainbows stack) |
+| EXPLOIT (new mechanics) | ROOT ACCESS (+50% boss damage a level), MAGNET (pixels drift towards your last tap), OVERFLOW (the nuke keeps half its charge), GLITCH PIXEL (pixels that copy your last special), KERNEL PANIC (PIXEL ZERO every 3 boss kills) |
+
+Installing everything takes about 8 to 9 reboots.
+
+</details>
 
 ## Pacing
 
@@ -175,6 +202,15 @@ The game is tuned for roughly the first 20 to 30 minutes of play. Pacing is chec
 | --- | --- | --- | --- | --- |
 | Engaged (3 taps/s) | 0:21 | 2:44 | ~15:00 | 15 |
 | Casual (1.2 taps/s) | 0:24 | 4:17 | ~21:40 | 13 |
+
+### Reboots
+
+The KERNEL has to more than make up for each REBOOT's tougher prices and bosses. The balance bot plays five reboots in a row, spending its bits as it goes, and every run has to be quicker than the one before:
+
+| Simulated player | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Run 6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Human (1.5 taps/s, nukes by hand) | 1h 27m | 59m | 51m | 45m | 41m | 34m |
+| No nukes (1 tap/s) | 2h 17m | 2h 02m | 1h 14m | 1h 10m | 1h 00m | 58m |
 
 ## Saves and offline progress
 
@@ -264,12 +300,14 @@ docs/screenshots/   README images
 npm test
 ```
 
-77 tests cover:
+162 tests cover:
 
 - **Formulas:** cost curves, stat curves, caps, and that every mechanic is off at level 0
 - **Engine:** the opening (exactly one pixel), respawning, purchases and MAX buying, level-ups, crits, combos, blasts, drones, blue and golden pixels, rainbow mode, bombs, lasers, chains, the nuke, rain and determinism
 - **Saves:** export/import round trips, checksum tampering, version migration, sanitising hostile values, and offline clock-rollback protection
-- **Pacing:** two simulated players (engaged and casual) are run through 30 minutes of play, with milestones asserted to land in sensible windows
+- **KERNEL:** every node's effect, CORE BITS payouts, the two-step REBOOT, glitch pixels and the save migration that pays back earlier reboots
+- **Pacing:** simulated players are run through the opening, the boss fights and the late game, with milestones asserted to land in sensible windows
+- **Reboot ladder:** simulated players reboot five times in a row, and every run has to beat the one before
 
 The simulated player (`src/game/bot.ts`) taps the oldest pixel it can see, buys the cheapest affordable upgrade and launches nukes when ready. `npm run balance` prints its full levelling timeline. It is the quickest way to see what a tuning change does.
 
@@ -293,8 +331,7 @@ Hosted on Vercel, configured in `vercel.json` (Vite build, output `dist`).
 
 ## Roadmap
 
-- More of the late game beyond level 20 (something is stirring beneath the grid)
-- Prestige / reset layer
+- Act 2: beneath the grid, with armoured, splitting and shielded pixels
 - Sampled sound pack
 - Creatures to share the arena
 
